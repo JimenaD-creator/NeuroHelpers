@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp, Contact } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'expo-router';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { BrainIcon } from '@/components/BrainIcon';
 
 interface ContactItemProps {
   contact: Contact;
@@ -27,7 +30,7 @@ function ContactItem({ contact, onPress }: ContactItemProps) {
       
       {contact.isPrimary && (
         <View style={styles.primaryBadge}>
-          <Text style={styles.primaryBadgeText}>Principal</Text>
+          <Text style={styles.primaryBadgeText}>Primary</Text>
         </View>
       )}
       
@@ -37,7 +40,10 @@ function ContactItem({ contact, onPress }: ContactItemProps) {
 }
 
 export default function ContactsScreen() {
-  const { contacts, setContacts } = useApp();
+  const router = useRouter();
+  const { role } = useAuth();
+  const { contacts, setContacts, emotionalState, isConnected } = useApp();
+  const isCaregiver = role === 'caregiver';
 
   const handleContactPress = (contact: Contact) => {
     // Toggle primary contact
@@ -46,6 +52,62 @@ export default function ContactsScreen() {
       isPrimary: c.id === contact.id,
     })));
   };
+
+  if (isCaregiver) {
+    const emotionalStateLabels = {
+      calmado: 'Calm',
+      estres: 'Stress',
+      panico: 'Panic',
+    } as const;
+
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.caregiverContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.connectionStatus}>
+          <Text style={styles.connectionLabel}>Patient BCI connection</Text>
+          <View style={styles.connectionIndicator}>
+            <View style={[styles.connectionDot, { backgroundColor: isConnected ? Colors.success : Colors.danger }]} />
+            <Text style={[styles.connectionText, { color: isConnected ? Colors.success : Colors.danger }]}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.brainContainer}>
+          <BrainIcon state={emotionalState} size={130} />
+          <Text style={styles.stateLabel}>Detected patient emotional state</Text>
+          <Text style={styles.stateValue}>{emotionalStateLabels[emotionalState]}</Text>
+        </View>
+
+        <View style={styles.alertBanner}>
+          <Ionicons name="warning" size={20} color="#92400E" />
+          <View style={styles.alertBody}>
+            <Text style={styles.alertTitle}>Priority Alert Area</Text>
+            <Text style={styles.alertText}>No emergency alert right now. New alerts will appear here immediately.</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.primaryAction} onPress={() => router.push('/(tabs)/communication')}>
+          <Ionicons name="chatbubble-ellipses" size={24} color={Colors.white} />
+          <Text style={styles.primaryActionText}>SEND MESSAGE</Text>
+        </TouchableOpacity>
+
+        <View style={styles.careCard}>
+          <View style={styles.careHeader}>
+            <Text style={styles.careTitle}>Patient Overview</Text>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
+          </View>
+
+          <Text style={styles.patientName}>BCI User</Text>
+          <Text style={styles.patientMeta}>Connection: Stable</Text>
+          <Text style={styles.patientMeta}>Emotional state: Calm</Text>
+          <Text style={styles.patientMeta}>Emergency alerts: None</Text>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -69,6 +131,136 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  caregiverContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+  connectionStatus: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  connectionLabel: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  connectionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  connectionText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.medium,
+  },
+  brainContainer: {
+    alignItems: 'center',
+    paddingBottom: Spacing.lg,
+  },
+  stateLabel: {
+    marginTop: Spacing.md,
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
+  },
+  stateValue: {
+    marginTop: Spacing.xs,
+    color: Colors.text,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+  },
+  alertBody: {
+    flex: 1,
+  },
+  alertTitle: {
+    color: '#991B1B',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    marginBottom: 2,
+  },
+  alertText: {
+    color: '#7C2D12',
+    fontSize: FontSize.sm,
+  },
+  careCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: Spacing.lg,
+  },
+  careHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  careTitle: {
+    color: Colors.text,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EDE9FE',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 99,
+    backgroundColor: '#7C3AED',
+  },
+  liveText: {
+    color: '#5B21B6',
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+  },
+  patientName: {
+    color: Colors.text,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    marginBottom: Spacing.xs,
+  },
+  patientMeta: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
+    marginBottom: 4,
+  },
+  primaryAction: {
+    marginTop: Spacing.md,
+    backgroundColor: Colors.primary,
+    minHeight: 54,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  primaryActionText: {
+    color: Colors.white,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
   },
   listContent: {
     paddingVertical: Spacing.md,

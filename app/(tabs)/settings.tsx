@@ -31,7 +31,7 @@ function SettingRow({ label, value, onPress, showChevron = true }: SettingRowPro
 
 export default function SettingsScreen() {
   const { settings, setSettings } = useApp();
-  const {logout} = useAuth();
+  const { logout, role } = useAuth();
 
   const handleVoiceToggle = (value: boolean) => {
     setSettings({ ...settings, voiceEnabled: value });
@@ -56,9 +56,17 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.profileHeader}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={30} color={Colors.primary} />
+        </View>
+        <Text style={styles.profileName}>{role === 'caregiver' ? 'Caregiver User' : 'BCI User'}</Text>
+        <Text style={styles.profileRole}>{role === 'caregiver' ? 'Caregiver Profile' : 'Patient Profile'}</Text>
+      </View>
+
       {/* Voice Configuration */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Voice settings</Text>
+        <Text style={styles.sectionTitle}>Voice Settings</Text>
         
         <View style={styles.card}>
           <View style={styles.settingRow}>
@@ -111,7 +119,7 @@ export default function SettingsScreen() {
 
       {/* BCI Sensitivity */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>BCI sensitivity</Text>
+        <Text style={styles.sectionTitle}>BCI Sensitivity</Text>
         
         <View style={styles.card}>
           <SettingRow
@@ -124,12 +132,12 @@ export default function SettingsScreen() {
 
       {/* Other Options */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Other options</Text>
+        <Text style={styles.sectionTitle}>Other Options</Text>
         
         <View style={styles.card}>
           <SettingRow label="Tutorial" />
           <View style={styles.separator} />
-          <SettingRow label="About the app" />
+          <SettingRow label="About App" />
         </View>
       </View>
       <TouchableOpacity
@@ -158,6 +166,32 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Spacing.lg,
+  },
+  profileHeader: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileName: {
+    marginTop: Spacing.sm,
+    color: Colors.text,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  profileRole: {
+    marginTop: 4,
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
   },
   section: {
     marginBottom: Spacing.xl,

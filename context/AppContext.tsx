@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, ReactNode, useEffect } from 'react';
 
 export type EmotionalState = 'calmado' | 'estres' | 'panico';
 
@@ -101,6 +101,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentPlayingMessage, setCurrentPlayingMessage] = useState<Message | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const pendingEmergencyChatTextRef = useRef<string | null>(null);
+  const panicEmergencyLockRef = useRef(false);
+
+  useEffect(() => {
+    const states: EmotionalState[] = ['calmado', 'estres', 'panico'];
+    let idx = 0;
+    const interval = setInterval(() => {
+      idx = (idx + 1) % states.length;
+      setEmotionalState(states[idx]);
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (emotionalState !== 'panico') {
+      panicEmergencyLockRef.current = false;
+    }
+  }, [emotionalState]);
 
   const primaryContact = contacts.find(c => c.isPrimary) || null;
 
@@ -115,6 +133,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const triggerEmergency = () => {
+    if (isEmergencyActive) return;
+    if (emotionalState === 'panico' && panicEmergencyLockRef.current) return;
+    if (emotionalState === 'panico') {
+      panicEmergencyLockRef.current = true;
+    }
+
     setIsEmergencyActive(true);
     setAlertStatus({
       contactsNotified: contacts

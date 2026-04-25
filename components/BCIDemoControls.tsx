@@ -124,7 +124,7 @@ export function BCIDemoControls() {
 const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
-    bottom: 600,
+    bottom: 550,
     right: 20,
     width: 56,
     height: 56,

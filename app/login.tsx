@@ -1,13 +1,13 @@
 // app/login.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
 
 type Role = 'patient' | 'caregiver';
-type LoginStep = 'role' | 'pin' | 'verifying' | 'success';
+type LoginStep = 'role' | 'pin';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -42,38 +42,33 @@ export default function LoginScreen() {
     if (loading || !role || pin.length !== MAX_PIN) return;
     setLoading(true);
     setError('');
-    setStep('verifying');
 
     const ok = await login(role, pin);
 
     if (!ok) {
       setLoading(false);
-      setStep('pin');
       setError('Invalid PIN for selected role');
       setPin('');
       return;
     }
 
-    setStep('success');
-    setTimeout(() => {
-      router.replace(role === 'caregiver' ? '/(tabs)/contacts' : '/(tabs)');
-    }, 900);
+    router.replace(role === 'caregiver' ? '/(tabs)/contacts' : '/(tabs)');
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.logoWrap}>
         <View style={styles.logoBox}>
-          <Ionicons name="sparkles" size={24} color={Colors.primary} />
+          <MaterialCommunityIcons name="brain" size={34} color={Colors.primary} />
         </View>
-        <Text style={styles.title}>BCI CARE</Text>
+        <Text style={styles.title}>NeuroGuardian</Text>
         <Text style={styles.subtitle}>Communication and care assist powered by BCI</Text>
       </View>
 
       {step === 'role' && (
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>What is your role?</Text>
-          <TouchableOpacity style={styles.roleCard} onPress={() => selectRole('patient')} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.roleCard, styles.roleCardPatient]} onPress={() => selectRole('patient')} activeOpacity={0.85}>
             <View style={styles.roleIcon}>
               <Ionicons name="person" size={20} color={Colors.primary} />
             </View>
@@ -84,9 +79,9 @@ export default function LoginScreen() {
             <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.roleCard} onPress={() => selectRole('caregiver')} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.roleCard, styles.roleCardCaregiver]} onPress={() => selectRole('caregiver')} activeOpacity={0.85}>
             <View style={styles.roleIconGray}>
-              <Ionicons name="shield-checkmark" size={20} color={Colors.textSecondary} />
+              <Ionicons name="shield-checkmark" size={20} color="#FCA5A5" />
             </View>
             <View style={styles.roleBody}>
               <Text style={styles.roleLabel}>Caregiver</Text>
@@ -136,26 +131,6 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {step === 'verifying' && (
-        <View style={styles.centerState}>
-          <View style={styles.stateCircle}>
-            <Ionicons name="lock-closed" size={40} color={Colors.primary} />
-          </View>
-          <Text style={styles.stateTitle}>Verifying...</Text>
-          <Text style={styles.stateSub}>Please wait</Text>
-          <ActivityIndicator style={{ marginTop: 12 }} color={Colors.primary} />
-        </View>
-      )}
-
-      {step === 'success' && (
-        <View style={styles.centerState}>
-          <View style={[styles.stateCircle, styles.stateCircleSuccess]}>
-            <Ionicons name="checkmark" size={44} color={Colors.success} />
-          </View>
-          <Text style={styles.stateTitle}>Welcome!</Text>
-          <Text style={styles.stateSub}>Redirecting...</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -163,82 +138,98 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xxl,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    justifyContent: 'center',
   },
   logoWrap: {
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl + 4,
+    marginTop: 0,
   },
   logoBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   title: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: FontWeight.bold,
-    color: Colors.text,
+    color: Colors.primary,
     textAlign: 'center',
   },
   subtitle: {
     marginTop: 6,
     textAlign: 'center',
     color: Colors.textSecondary,
-    maxWidth: 280,
+    maxWidth: 320,
+    fontSize: FontSize.md,
   },
   panel: {
     backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#BFDBFE',
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   panelTitle: {
-    fontSize: FontSize.md,
+    fontSize: FontSize.xl,
     fontWeight: FontWeight.semibold,
-    color: Colors.text,
+    color: Colors.primary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   backBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primaryLight,
   },
   roleCard: {
-    minHeight: 68,
+    minHeight: 86,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
   },
+  roleCardPatient: {
+    borderColor: '#93C5FD',
+    backgroundColor: '#EFF6FF',
+  },
+  roleCardCaregiver: {
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
   roleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primaryLight,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   roleIconGray: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -248,23 +239,23 @@ const styles = StyleSheet.create({
   roleLabel: {
     color: Colors.text,
     fontWeight: FontWeight.semibold,
-    fontSize: FontSize.md,
+    fontSize: FontSize.xl,
   },
   roleSub: {
     color: Colors.textSecondary,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.sm,
     marginTop: 2,
   },
   pinRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 10,
-    marginVertical: Spacing.sm,
+    gap: 12,
+    marginVertical: Spacing.md,
   },
   pinDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
@@ -281,16 +272,16 @@ const styles = StyleSheet.create({
   },
   keyBtn: {
     width: '30%',
-    height: 46,
+    height: 60,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
   },
   keyText: {
-    fontSize: FontSize.lg,
+    fontSize: FontSize.xl,
     color: Colors.text,
     fontWeight: FontWeight.semibold,
   },
@@ -304,8 +295,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   keyConfirmDisabled: {
-    backgroundColor: '#A7A0F6',
-    borderColor: '#A7A0F6',
+    backgroundColor: '#93C5FD',
+    borderColor: '#93C5FD',
   },
   centerState: {
     marginTop: Spacing.xxl,

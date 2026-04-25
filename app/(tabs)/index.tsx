@@ -1,8 +1,9 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight, getEmotionalStateColor } from '@/constants/theme';
 import { BrainIcon } from '@/components/BrainIcon';
 import { PanicDialog } from '@/components/PanicDialog';
@@ -10,8 +11,10 @@ import { BCIDemoControls } from '@/components/BCIDemoControls';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { role } = useAuth();
   const [isSendingEmergency, setIsSendingEmergency] = useState(false);
   const [showEmergencyErrorModal, setShowEmergencyErrorModal] = useState(false);
+  const autoEmergencyTriggeredRef = useRef(false);
   const { 
     emotionalState, 
     isConnected, 
@@ -21,6 +24,7 @@ export default function HomeScreen() {
     setShowPanicDialog,
     settings,
   } = useApp();
+  const isPatient = role === 'patient';
 
   const stateColors = getEmotionalStateColor(emotionalState);
   
@@ -30,12 +34,17 @@ export default function HomeScreen() {
     panico: 'Panic',
   };
 
-  // Show panic dialog when panic state is detected
+  // Auto-trigger emergency when panic is detected (patient only).
   useEffect(() => {
-    if (emotionalState === 'panico') {
-      setShowPanicDialog(true);
+    if (emotionalState !== 'panico') {
+      autoEmergencyTriggeredRef.current = false;
+      return;
     }
-  }, [emotionalState]);
+    if (!isPatient || isSendingEmergency || autoEmergencyTriggeredRef.current) return;
+
+    autoEmergencyTriggeredRef.current = true;
+    handleEmergencyTap();
+  }, [emotionalState, isPatient]);
 
   const validateEmergencySend = async () => {
     // For MVP: treat a registered primary contact with phone as successful delivery validation.
@@ -110,31 +119,6 @@ export default function HomeScreen() {
           <Text style={styles.messageButtonText}>SEND MESSAGE</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Primary Contact */}
-      {primaryContact && (
-        <View style={styles.contactContainer}>
-          <View style={styles.contactInfo}>
-            <View style={styles.contactAvatar}>
-              <Ionicons name="person" size={20} color={Colors.primary} />
-            </View>
-            <View style={styles.contactTextWrap}>
-              <Text style={styles.contactLabel}>Primary contact</Text>
-              <Text style={styles.contactName} numberOfLines={1} ellipsizeMode="tail">
-                {primaryContact.name}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.voiceButton}>
-            <Ionicons 
-              name={settings.voiceEnabled ? "volume-high-outline" : "volume-mute-outline"} 
-              size={24} 
-              color={Colors.textSecondary} 
-            />
-            <Text style={styles.voiceText}>Voice enabled</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Panic Dialog */}
       <PanicDialog 
@@ -251,59 +235,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-  },
-  contactContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    marginTop: 'auto',
-    marginBottom: Spacing.lg,
-  },
-  contactInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    flex: 1,
-    minWidth: 0,
-    paddingRight: Spacing.sm,
-  },
-  contactTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  contactAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contactLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
-  contactName: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.medium,
-    color: Colors.text,
-  },
-  voiceButton: {
-    alignItems: 'center',
-    gap: Spacing.xs,
-    minWidth: 92,
-    maxWidth: 92,
-    alignSelf: 'center',
-    marginLeft: Spacing.md,
-    flexShrink: 0,
-  },
-  voiceText: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-    textAlign: 'center',
   },
   modalBackdrop: {
     flex: 1,

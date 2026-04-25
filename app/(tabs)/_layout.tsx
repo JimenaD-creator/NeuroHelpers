@@ -1,11 +1,26 @@
 import { Tabs } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useApp, EmotionalState } from '@/context/AppContext';
+
+const HEADER_BY_STATE: Record<EmotionalState, { bg: string; fg: string }> = {
+  calmado: { bg: '#16A34A', fg: '#FFFFFF' },
+  estres: { bg: '#D97706', fg: '#FFFFFF' },
+  panico: { bg: '#DC2626', fg: '#FFFFFF' },
+};
 
 export default function TabsLayout() {
-  const { role } = useAuth();
+  const { role, isLoggedIn, isBootstrapping } = useAuth();
+  const { emotionalState } = useApp();
   const isCaregiver = role === 'caregiver';
+  const headerTheme = HEADER_BY_STATE[emotionalState];
+
+  if (!isBootstrapping && !isLoggedIn) {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -22,9 +37,9 @@ export default function TabsLayout() {
           fontSize: 12,
           fontWeight: '500',
         },
-        headerStyle: { backgroundColor: '#FFF1A8' },
-        headerTintColor: '#B77900',
-        headerTitleStyle: { color: '#B77900', fontWeight: '700' },
+        headerStyle: { backgroundColor: headerTheme.bg },
+        headerTintColor: headerTheme.fg,
+        headerTitleStyle: { color: headerTheme.fg, fontWeight: '700' },
         headerTitleAlign: 'center',
         headerShadowVisible: false,
       }}
@@ -59,9 +74,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          headerTitle: 'Settings',
-          tabBarIcon: ({ color, size }) => <Ionicons name="cog-outline" size={size} color={color} />,
+          title: 'Profile',
+          headerTitle: 'Profile',
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
       />
     </Tabs>

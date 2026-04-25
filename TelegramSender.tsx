@@ -243,16 +243,32 @@ function CaregiverComposer({
 
 // ─── Patient Panel ────────────────────────────────────────────────────────────
 
+const QUICK_ACTIONS = [
+  { id: 'ok',   icon: 'thumbs-up' as const,  label: 'Estoy bien',     border: Colors.success,  bg: '#DCFCE7' },
+  { id: 'help', icon: 'hand-left' as const,  label: 'Necesito ayuda', border: Colors.warning,  bg: '#FFF5DB' },
+];
+
 function PatientPanel({
-  message, setMessage, canSend, loading, isSmall, isMedium, onSend, onOpenSpeller,
+  message, setMessage, canSend, loading, isSmall, isMedium, onSend, onQuickSend, onOpenSpeller,
 }: {
   message: string; setMessage: (v: string) => void; canSend: boolean;
   loading: boolean; isSmall: boolean; isMedium: boolean;
-  onSend: () => void; onOpenSpeller: () => void;
+  onSend: () => void; onQuickSend: (text: string) => void; onOpenSpeller: () => void;
 }) {
   return (
     <>
       <View style={s.quickActions}>
+        {QUICK_ACTIONS.map((action) => (
+          <TouchableOpacity
+            key={action.id}
+            activeOpacity={0.82}
+            style={[s.quickBtn, s.quickResponseBtn, { borderColor: action.border, backgroundColor: action.bg }]}
+            onPress={() => onQuickSend(action.label)}
+          >
+            <Ionicons name={action.icon} size={26} color={action.border} />
+            <Text style={[s.quickText, { color: action.border }]}>{action.label}</Text>
+          </TouchableOpacity>
+        ))}
         <TouchableOpacity style={[s.quickBtn, s.spellerToggle]} onPress={onOpenSpeller} activeOpacity={0.82}>
           <Ionicons name="create" size={24} color={Colors.primary} />
           <Text style={[s.quickText, s.spellerToggleText]}>Escribir (Speller)</Text>
@@ -522,6 +538,7 @@ export default function TelegramSender() {
                 isSmall={isSmall}
                 isMedium={isMedium}
                 onSend={() => postMessage(message)}
+                onQuickSend={(text) => postMessage(text)}
                 onOpenSpeller={() => setShowSpeller(true)}
               />
             )}
@@ -656,6 +673,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8,
   },
   quickText: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  quickResponseBtn: { height: 44, justifyContent: 'center', flexDirection: 'row', gap: 10 },
   spellerToggle: { borderColor: Colors.primary, backgroundColor: '#ECEBFF', justifyContent: 'center', alignItems: 'center' },
   spellerToggleText: { color: Colors.primary },
 

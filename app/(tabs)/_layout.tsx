@@ -1,5 +1,5 @@
-import { Tabs } from 'expo-router';
-import { Redirect } from 'expo-router';
+import { Tabs, Redirect, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -12,10 +12,20 @@ const HEADER_BY_STATE: Record<EmotionalState, { bg: string; fg: string }> = {
 };
 
 export default function TabsLayout() {
+  const router = useRouter();
   const { role, isLoggedIn, isBootstrapping } = useAuth();
-  const { emotionalState } = useApp();
+  const { emotionalState, isEmergencyActive } = useApp();
   const isCaregiver = role === 'caregiver';
   const headerTheme = HEADER_BY_STATE[emotionalState];
+  const prevEmergency = useRef(false);
+
+  // Send caregiver to the emergency screen whenever a new emergency fires
+  useEffect(() => {
+    if (isEmergencyActive && !prevEmergency.current && isCaregiver) {
+      router.push('/emergency');
+    }
+    prevEmergency.current = isEmergencyActive;
+  }, [isEmergencyActive, isCaregiver]);
 
   if (!isBootstrapping && !isLoggedIn) {
     return <Redirect href="/login" />;

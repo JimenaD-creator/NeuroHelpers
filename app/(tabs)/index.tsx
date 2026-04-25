@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+﻿import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -10,6 +10,8 @@ import { BCIDemoControls } from '@/components/BCIDemoControls';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [isSendingEmergency, setIsSendingEmergency] = useState(false);
+  const [showEmergencyErrorModal, setShowEmergencyErrorModal] = useState(false);
   const { 
     emotionalState, 
     isConnected, 
@@ -35,13 +37,31 @@ export default function HomeScreen() {
     }
   }, [emotionalState]);
 
-  const handleEmergency = () => {
-    triggerEmergency();
-    router.push('/emergency');
+  const validateEmergencySend = async () => {
+    // For MVP: treat a registered primary contact with phone as successful delivery validation.
+    if (!primaryContact?.phone?.trim()) return false;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return true;
+  };
+
+  const handleEmergencyTap = async () => {
+    if (isSendingEmergency) return;
+    setIsSendingEmergency(true);
+
+    const delivered = await validateEmergencySend();
+    setIsSendingEmergency(false);
+
+    if (delivered) {
+      triggerEmergency();
+      router.push('/emergency');
+      return;
+    }
+
+    setShowEmergencyErrorModal(true);
   };
 
   const handleSendMessage = () => {
-    router.push('/telegram-sender');
+    router.push('/communication');
   };
 
   return (
@@ -73,11 +93,12 @@ export default function HomeScreen() {
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.emergencyButton]}
-          onPress={handleEmergency}
+          onPress={handleEmergencyTap}
           activeOpacity={0.8}
+          disabled={isSendingEmergency}
         >
           <Ionicons name="warning" size={24} color={Colors.white} />
-          <Text style={styles.emergencyButtonText}>EMERGENCY</Text>
+          <Text style={styles.emergencyButtonText}>{isSendingEmergency ? 'SENDING ALERT...' : 'EMERGENCY'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -121,9 +142,24 @@ export default function HomeScreen() {
         onCancel={() => setShowPanicDialog(false)}
         onConfirm={() => {
           setShowPanicDialog(false);
-          handleEmergency();
+          handleEmergencyTap();
         }}
       />
+
+      <Modal visible={showEmergencyErrorModal} transparent animationType="fade" onRequestClose={() => setShowEmergencyErrorModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Alert not sent</Text>
+            <Text style={styles.modalBody}>No valid primary contact is registered. Please update contact settings.</Text>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalCancelButton, styles.modalSingleButton]}
+              onPress={() => setShowEmergencyErrorModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* BCI Demo Controls - For testing, remove in production */}
       <BCIDemoControls />
@@ -268,5 +304,61 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  modalBody: {
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  modalCancelText: {
+    color: Colors.textSecondary,
+    fontWeight: FontWeight.semibold,
+  },
+  modalConfirmButton: {
+    backgroundColor: Colors.emergency,
+  },
+  modalConfirmText: {
+    color: Colors.white,
+    fontWeight: FontWeight.bold,
+  },
+  modalSingleButton: {
+    marginTop: Spacing.xs,
   },
 });

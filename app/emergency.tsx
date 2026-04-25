@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,9 +36,25 @@ function StatusItem({ icon, label, completed, inProgress }: StatusItemProps) {
   );
 }
 
+const EMERGENCY_CHAT_TEXT = 'EMERGENCY!';
+
 export default function EmergencyScreen() {
   const router = useRouter();
-  const { alertStatus, cancelEmergency } = useApp();
+  const { alertStatus, cancelEmergency, queueEmergencyChatMessage } = useApp();
+  const hasAutoClosed = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoClosed.current) return;
+    const { contactsNotified, messageSent } = alertStatus;
+    const allContacts =
+      contactsNotified.length > 0 && contactsNotified.every((c) => c.notified);
+    if (!allContacts || !messageSent) return;
+
+    hasAutoClosed.current = true;
+    queueEmergencyChatMessage(EMERGENCY_CHAT_TEXT);
+    cancelEmergency();
+    router.replace('/communication');
+  }, [alertStatus, cancelEmergency, queueEmergencyChatMessage, router]);
 
   const handleCancel = () => {
     cancelEmergency();
@@ -67,26 +83,15 @@ export default function EmergencyScreen() {
               icon="person"
               label={contact.name}
               completed={contact.notified}
+              inProgress={!contact.notified}
             />
           ))}
-          
-          <StatusItem
-            icon="location"
-            label="Ubicación compartida"
-            completed={alertStatus.locationShared}
-          />
-          
+
           <StatusItem
             icon="chatbubble"
-            label="Mensaje enviado"
+            label="Help message sent"
             completed={alertStatus.messageSent}
-          />
-          
-          <StatusItem
-            icon="call"
-            label="Llamando automáticamente..."
-            completed={false}
-            inProgress={alertStatus.calling}
+            inProgress={!alertStatus.messageSent}
           />
         </View>
 
@@ -96,7 +101,7 @@ export default function EmergencyScreen() {
           onPress={handleCancel}
           activeOpacity={0.8}
         >
-          <Text style={styles.cancelButtonText}>CANCELAR ALERTA</Text>
+          <Text style={styles.cancelButtonText}>CANCEL ALERT</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

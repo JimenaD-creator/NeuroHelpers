@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,17 +6,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useApp } from '@/context/AppContext';
 import { Colors } from './constants/theme';
 
-const BOT_TOKEN = '';
-const CHAT_ID = '';
+const BOT_TOKEN = '8368260391:AAHo_Gr81VRg0XHA3We9s9butVaIikH17cg';
+const CHAT_ID = '8648890196';
 
 type ChatItem = {
   id: string;
@@ -29,12 +32,12 @@ type ChatItem = {
 const QUICK_ACTIONS = [
   { id: 'ok', icon: 'thumbs-up', label: "I'm okay", border: Colors.success, bg: '#DCFCE7' },
   { id: 'help', icon: 'hand-left', label: 'I need help', border: Colors.warning, bg: '#FFF5DB' },
-  { id: 'panic', icon: 'warning', label: 'Emergency', border: Colors.emergency, bg: '#FEECEC' },
 ];
 
-const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T'];
+const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 export default function TelegramSender() {
+  const { consumePendingEmergencyChatMessage } = useApp();
   const { width } = useWindowDimensions();
   const isSmall = width < 360;
   const isMedium = width >= 360 && width < 400;
@@ -44,6 +47,9 @@ export default function TelegramSender() {
   const [lastStatus, setLastStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showSpeller, setShowSpeller] = useState(false);
   const [chat, setChat] = useState<ChatItem[]>([]);
+  const [lastUpdateId, setLastUpdateId] = useState<number>(0);
+
+  const seenIncomingIds = useRef<Set<string>>(new Set());
 
   const canSend = message.trim().length > 0 && !loading;
   const latestChatItem = chat.length > 0 ? chat[chat.length - 1] : null;
@@ -55,9 +61,30 @@ export default function TelegramSender() {
     return 'Status: Calm';
   }, [lastStatus]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingEmergencyChatMessage();
+      if (!pending) return;
+      const id = `emergency-${Date.now()}`;
+      setChat((prev) => [
+        ...prev,
+        {
+          id,
+          author: 'outgoing',
+          text: pending.toUpperCase(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          deliveryStatus: 'sent',
+        },
+      ]);
+    }, [consumePendingEmergencyChatMessage])
+  );
+
   const postMessage = async (text: string) => {
     const clean = text.trim();
     if (!clean) return;
+
+    // Collapse speller after sending so delivery status stays visible.
+    setShowSpeller(false);
 
     const messageId = String(Date.now());
     const localMessage: ChatItem = {
@@ -114,6 +141,60 @@ export default function TelegramSender() {
     }
   };
 
+  useEffect(() => {
+    let mounted = true;
+    let polling = false;
+    const pollUpdates = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=20`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!mounted || !data.ok || !Array.isArray(data.result)) return;
+        let maxId = lastUpdateId;
+        const incomingToAppend: ChatItem[] = [];
+        for (const update of data.result) {
+          if (typeof update.update_id === 'number') {
+            maxId = Math.max(maxId, update.update_id);
+          }
+          const msg = update?.message;
+          if (!msg?.text) continue;
+          if (String(msg?.chat?.id) !== String(CHAT_ID)) continue;
+          const incomingId = `in-${update.update_id}`;
+          if (seenIncomingIds.current.has(incomingId)) continue;
+          seenIncomingIds.current.add(incomingId);
+          incomingToAppend.push({
+            id: incomingId,
+            author: 'incoming',
+            text: String(msg.text),
+            time: new Date((msg.date ?? Math.floor(Date.now() / 1000)) * 1000).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          });
+        }
+        if (incomingToAppend.length > 0) {
+          setChat((prev) => [...prev, ...incomingToAppend]);
+        }
+        if (maxId > lastUpdateId) {
+          setLastUpdateId(maxId);
+        }
+      } catch {
+        // ignore poll errors
+      } finally {
+        polling = false;
+      }
+    };
+    const interval = setInterval(pollUpdates, 3000);
+    pollUpdates();
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [lastUpdateId]);
+
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.wrapper}>
       <View style={styles.phoneFrame}>
@@ -148,97 +229,128 @@ export default function TelegramSender() {
           )}
         </ScrollView>
 
-        <View style={styles.quickActions}>
-          {QUICK_ACTIONS.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              activeOpacity={0.82}
-              style={[
-                styles.quickBtn,
-                styles.quickResponseBtn,
-                isSmall && styles.quickResponseBtnSmall,
-                { borderColor: action.border, backgroundColor: action.bg },
-              ]}
-              onPress={() => postMessage(action.label)}
-            >
-              <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={28} color={action.border} />
-              <Text
-                style={[
-                  styles.quickText,
-                  styles.quickResponseText,
-                  isSmall && styles.quickTextSmall,
-                  { color: action.border },
-                ]}
+        {!showSpeller && (
+          <View style={styles.bottomPanel}>
+            <View style={styles.quickActions}>
+              {QUICK_ACTIONS.map((action) => (
+                <TouchableOpacity
+                  key={action.id}
+                  activeOpacity={0.82}
+                  style={[
+                    styles.quickBtn,
+                    styles.quickResponseBtn,
+                    isSmall && styles.quickResponseBtnSmall,
+                    { borderColor: action.border, backgroundColor: action.bg },
+                  ]}
+                  onPress={() => postMessage(action.label)}
+                >
+                  <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={28} color={action.border} />
+                  <Text
+                    style={[
+                      styles.quickText,
+                      styles.quickResponseText,
+                      isSmall && styles.quickTextSmall,
+                      { color: action.border },
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.quickBtn, isSmall && styles.quickBtnSmall, styles.spellerToggle]}
+                onPress={() => setShowSpeller(true)}
+                activeOpacity={0.82}
               >
-                {action.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={[styles.quickBtn, isSmall && styles.quickBtnSmall, styles.spellerToggle]}
-            onPress={() => setShowSpeller((prev) => !prev)}
-            activeOpacity={0.82}
-          >
-            <Text style={styles.quickIcon}>✏️</Text>
-            <Text style={[styles.quickText, isSmall && styles.quickTextSmall]}>Type (Speller)</Text>
-          </TouchableOpacity>
-        </View>
+              <Ionicons name="create" size={24} color={Colors.primary} />
+              <Text style={[styles.quickText, styles.spellerToggleText, isSmall && styles.quickTextSmall]}>Type (Speller)</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.composer, isSmall && styles.composerSmall]}>
+              <TextInput
+                style={[styles.input, isSmall && styles.inputSmall]}
+                placeholder="Message being composed..."
+                placeholderTextColor={Colors.textMuted}
+                value={message}
+                onChangeText={setMessage}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  isSmall && styles.sendBtnSmall,
+                  isMedium && styles.sendBtnMedium,
+                  !canSend && styles.sendBtnDisabled,
+                ]}
+                onPress={() => postMessage(message)}
+                disabled={!canSend}
+              >
+                {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.sendText}>Send</Text>}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerLabel}>Auto-scan active</Text>
+              <View style={styles.scanDots}>
+                <View style={[styles.dot, styles.dotOn]} />
+                <View style={[styles.dot, styles.dotOn]} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+              </View>
+            </View>
+          </View>
+        )}
 
         {showSpeller && (
-          <View style={styles.spellerCard}>
-            <View style={styles.spellerHeader}>
+          <View style={styles.spellerOverlay}>
+            <View style={styles.spellerOverlayHeader}>
               <Text style={styles.spellerTitle}>BCI Speller</Text>
               <TouchableOpacity onPress={() => setShowSpeller(false)}>
                 <Text style={styles.close}>✕</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.lettersGrid}>
-              {LETTERS.map((letter, index) => (
-                <TouchableOpacity
-                  key={letter + index}
-                  style={[styles.letterBtn, isSmall && styles.letterBtnSmall]}
-                  onPress={() => setMessage((prev) => prev + letter)}
-                >
-                  <Text style={styles.letterText}>{letter}</Text>
-                </TouchableOpacity>
-              ))}
+
+            <View style={[styles.composer, isSmall && styles.composerSmall, styles.composerInSpeller]}>
+              <TextInput
+                style={[styles.input, isSmall && styles.inputSmall]}
+                placeholder="Message being composed..."
+                placeholderTextColor={Colors.textMuted}
+                value={message}
+                onChangeText={setMessage}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  isSmall && styles.sendBtnSmall,
+                  isMedium && styles.sendBtnMedium,
+                  !canSend && styles.sendBtnDisabled,
+                ]}
+                onPress={() => postMessage(message)}
+                disabled={!canSend}
+              >
+                {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.sendText}>Send</Text>}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.spellerGridWrap}>
+              <FlatList
+                data={LETTERS}
+                keyExtractor={(item, index) => `${item}-${index}`}
+                numColumns={5}
+                contentContainerStyle={styles.spellerGridContent}
+                columnWrapperStyle={styles.spellerGridRow}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.letterBtn, isSmall && styles.letterBtnSmall, styles.letterBtnExpanded]}
+                    onPress={() => setMessage((prev) => prev + item)}
+                  >
+                    <Text style={styles.letterText}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+              />
             </View>
           </View>
         )}
-
-        <View style={[styles.composer, isSmall && styles.composerSmall]}>
-          <TextInput
-            style={[styles.input, isSmall && styles.inputSmall]}
-            placeholder="Message being composed..."
-            placeholderTextColor={Colors.textMuted}
-            value={message}
-            onChangeText={setMessage}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              isSmall && styles.sendBtnSmall,
-              isMedium && styles.sendBtnMedium,
-              !canSend && styles.sendBtnDisabled,
-            ]}
-            onPress={() => postMessage(message)}
-            disabled={!canSend}
-          >
-            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.sendText}>Send</Text>}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerIcon}>🔊</Text>
-          <Text style={styles.footerLabel}>Auto-scan active</Text>
-          <View style={styles.scanDots}>
-            <View style={[styles.dot, styles.dotOn]} />
-            <View style={[styles.dot, styles.dotOn]} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-          </View>
-          <Text style={styles.footerIcon}>⚙️</Text>
-        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -298,8 +410,12 @@ const styles = StyleSheet.create({
   },
   stateDot: { width: 9, height: 9, borderRadius: 99, backgroundColor: Colors.success },
   stateText: { color: Colors.text, fontWeight: '700' },
-  chatArea: { flex: 1, minHeight: 0 },
+  chatArea: { minHeight: '52%', maxHeight: '60%' },
   chatContent: { paddingHorizontal: 12, paddingVertical: 12, gap: 10 },
+  bottomPanel: {
+    marginTop: 'auto',
+    paddingBottom: 0,
+  },
   bubble: {
     maxWidth: '80%',
     borderRadius: 12,
@@ -307,9 +423,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   bubbleIn: { alignSelf: 'flex-start', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border },
-  bubbleOut: { alignSelf: 'flex-end', backgroundColor: '#DED7FF', borderWidth: 1, borderColor: Colors.primary },
+  bubbleOut: { alignSelf: 'flex-end', backgroundColor: '#DBEAFE', borderWidth: 1, borderColor: '#2563EB' },
   bubbleText: { color: Colors.text, fontWeight: '600', fontSize: 16 },
-  bubbleOutText: { color: '#30208A' },
+  bubbleOutText: { color: '#1D4ED8' },
   bubbleTime: { color: Colors.textMuted, fontSize: 12, marginTop: 5 },
   metaRow: {
     marginTop: 5,
@@ -345,12 +461,12 @@ const styles = StyleSheet.create({
   voiceIcon: { fontSize: 32 },
   voiceTitle: { marginTop: 4, fontSize: 16, fontWeight: '700', color: Colors.primary },
   wave: { marginTop: 8, color: Colors.primary, fontWeight: '700', letterSpacing: 2 },
-  quickActions: { paddingHorizontal: 14, gap: 12, paddingTop: 14 },
+  quickActions: { paddingHorizontal: 14, gap: 7, paddingTop: 8, marginTop: 0 },
   quickBtn: {
     width: '100%',
     borderWidth: 1.5,
     borderRadius: 13,
-    height: 50,
+    height: 40,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -358,36 +474,42 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   quickResponseBtn: {
-    minHeight: 52,
-    height: 52,
+    minHeight: 40,
+    height: 40,
     justifyContent: 'center',
     flexDirection: 'row',
     paddingHorizontal: 12,
     gap: 10,
   },
   quickResponseBtnSmall: {
-    minHeight: 48,
-    height: 48,
+    minHeight: 38,
+    height: 38,
   },
   quickBtnSmall: {
-    height: 46,
+    height: 38,
     paddingHorizontal: 10,
   },
   quickIcon: { fontSize: 18 },
-  quickText: { fontSize: 15, fontWeight: '700', color: Colors.text, flexShrink: 1 },
+  quickText: { fontSize: 14, fontWeight: '700', color: Colors.text, flexShrink: 1 },
   quickResponseText: {
     textAlign: 'left',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   quickTextSmall: { fontSize: 14 },
   spellerToggle: {
     width: '100%',
-    borderColor: Colors.border,
-    backgroundColor: '#F4F5F8',
+    borderColor: Colors.primary,
+    backgroundColor: '#ECEBFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spellerToggleText: {
+    color: Colors.primary,
+    textAlign: 'center',
   },
   spellerCard: {
-    marginTop: 14,
+    marginTop: 8,
     marginHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
@@ -396,13 +518,62 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
+  spellerCardExpanded: {
+    minHeight: '62%',
+    maxHeight: '70%',
+  },
   spellerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   spellerTitle: { fontSize: 22, fontWeight: '800', color: Colors.text },
   close: { fontSize: 22, color: Colors.textSecondary, fontWeight: '700' },
   lettersGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  lettersGridExpanded: {
+    flex: 1,
+    alignContent: 'flex-start',
+  },
+  spellerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F3F4F8',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 0,
+  },
+  spellerOverlayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  composerInSpeller: {
+    marginTop: 0,
+    paddingHorizontal: 0,
+    paddingBottom: 6,
+  },
+  spellerGridWrap: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    padding: 8,
+  },
+  spellerGridContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingBottom: 0,
+  },
+  spellerGridRow: {
+    justifyContent: 'space-between',
+    marginBottom: 0,
+  },
+  letterBtnExpanded: {
+    flex: 1,
+    marginHorizontal: 3,
+    width: undefined,
+    height: 66,
+  },
   letterBtn: {
     width: '17.8%',
-    height: 42,
+    height: 56,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 10,
@@ -412,16 +583,17 @@ const styles = StyleSheet.create({
   },
   letterBtnSmall: {
     width: '17.5%',
-    height: 38,
+    height: 46,
   },
-  letterText: { fontWeight: '700', color: Colors.text, fontSize: 16 },
+  letterText: { fontWeight: '700', color: Colors.text, fontSize: 20 },
   composer: {
     paddingHorizontal: 12,
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 8,
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
+    marginTop: 0,
   },
   composerSmall: {
     gap: 6,
@@ -429,7 +601,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 48,
+    height: 40,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 12,
@@ -439,12 +611,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputSmall: {
-    height: 44,
+    height: 38,
     paddingHorizontal: 10,
   },
   sendBtn: {
     minWidth: 82,
-    height: 48,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -452,7 +624,7 @@ const styles = StyleSheet.create({
   },
   sendBtnSmall: {
     minWidth: 74,
-    height: 44,
+    height: 38,
   },
   sendBtnMedium: {
     minWidth: 80,
@@ -460,18 +632,18 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { backgroundColor: '#A7A0F6' },
   sendText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
   footer: {
-    height: 48,
-    marginTop: 12,
+    height: 38,
+    marginTop: 4,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    backgroundColor: Colors.white,
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 14,
+    gap: 10,
   },
-  footerIcon: { fontSize: 18 },
-  footerLabel: { color: Colors.textSecondary, fontWeight: '700' },
+  footerLabel: { color: Colors.textSecondary, fontWeight: '700', fontSize: 12 },
   scanDots: { flexDirection: 'row', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 9, backgroundColor: '#D1D5DB' },
   dotOn: { backgroundColor: Colors.primary },

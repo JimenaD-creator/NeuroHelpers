@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
 
 export type EmotionalState = 'calmado' | 'estres' | 'panico';
 
@@ -64,6 +64,9 @@ interface AppContextType {
   triggerEmergency: () => void;
   cancelEmergency: () => void;
   sendQuickMessage: (type: 'bien' | 'ayuda' | 'emergencia') => void;
+  /** Queued when emergency flow finishes; read once in chat (TelegramSender). */
+  queueEmergencyChatMessage: (text: string) => void;
+  consumePendingEmergencyChatMessage: () => string | null;
 }
 
 const defaultContacts: Contact[] = [
@@ -97,13 +100,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ]);
   const [currentPlayingMessage, setCurrentPlayingMessage] = useState<Message | null>(null);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const pendingEmergencyChatTextRef = useRef<string | null>(null);
 
   const primaryContact = contacts.find(c => c.isPrimary) || null;
+
+  const queueEmergencyChatMessage = useCallback((text: string) => {
+    pendingEmergencyChatTextRef.current = text;
+  }, []);
+
+  const consumePendingEmergencyChatMessage = useCallback(() => {
+    const t = pendingEmergencyChatTextRef.current;
+    pendingEmergencyChatTextRef.current = null;
+    return t;
+  }, []);
 
   const triggerEmergency = () => {
     setIsEmergencyActive(true);
     setAlertStatus({
-      contactsNotified: contacts.filter(c => c.isPrimary || c.name === 'Cuidador').map(c => ({ name: c.name, notified: false })),
+      contactsNotified: contacts
+        .filter((c) => c.isPrimary || c.name === 'Caregiver')
+        .map((c) => ({ name: c.name, notified: false })),
       locationShared: false,
       messageSent: false,
       calling: false,
@@ -125,16 +141,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 2000);
     
     setTimeout(() => {
-      setAlertStatus(prev => ({ ...prev, locationShared: true }));
-    }, 2500);
-    
-    setTimeout(() => {
       setAlertStatus(prev => ({ ...prev, messageSent: true }));
     }, 3000);
-    
-    setTimeout(() => {
-      setAlertStatus(prev => ({ ...prev, calling: true }));
-    }, 3500);
   };
 
   const cancelEmergency = () => {
@@ -194,6 +202,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         triggerEmergency,
         cancelEmergency,
         sendQuickMessage,
+        queueEmergencyChatMessage,
+        consumePendingEmergencyChatMessage,
       }}
     >
       {children}

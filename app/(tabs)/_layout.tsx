@@ -60,18 +60,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="communication"
         options={{
-          title: 'Communication',
-          headerTitle: 'Communication',
+          title: 'Chat',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
-          ),
-          headerRight: () => (
-            <Ionicons 
-              name="mic-outline" 
-              size={24} 
-              color="#B77900" 
-              style={{ marginRight: 16 }} 
-            />
           ),
         }}
       />

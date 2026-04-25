@@ -16,10 +16,11 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Colors } from './constants/theme';
 
-const BOT_TOKEN = '8368260391:AAHo_Gr81VRg0XHA3We9s9butVaIikH17cg';
-const CHAT_ID = '8648890196';
+const BOT_TOKEN = '';
+const CHAT_ID = '';
 
 type ChatItem = {
   id: string;
@@ -37,10 +38,12 @@ const QUICK_ACTIONS = [
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 export default function TelegramSender() {
+  const { role } = useAuth();
   const { consumePendingEmergencyChatMessage } = useApp();
   const { width } = useWindowDimensions();
   const isSmall = width < 360;
   const isMedium = width >= 360 && width < 400;
+  const isCaregiver = role === 'caregiver';
 
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -231,41 +234,43 @@ export default function TelegramSender() {
 
         {!showSpeller && (
           <View style={styles.bottomPanel}>
-            <View style={styles.quickActions}>
-              {QUICK_ACTIONS.map((action) => (
-                <TouchableOpacity
-                  key={action.id}
-                  activeOpacity={0.82}
-                  style={[
-                    styles.quickBtn,
-                    styles.quickResponseBtn,
-                    isSmall && styles.quickResponseBtnSmall,
-                    { borderColor: action.border, backgroundColor: action.bg },
-                  ]}
-                  onPress={() => postMessage(action.label)}
-                >
-                  <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={28} color={action.border} />
-                  <Text
+            {!isCaregiver && (
+              <View style={styles.quickActions}>
+                {QUICK_ACTIONS.map((action) => (
+                  <TouchableOpacity
+                    key={action.id}
+                    activeOpacity={0.82}
                     style={[
-                      styles.quickText,
-                      styles.quickResponseText,
-                      isSmall && styles.quickTextSmall,
-                      { color: action.border },
+                      styles.quickBtn,
+                      styles.quickResponseBtn,
+                      isSmall && styles.quickResponseBtnSmall,
+                      { borderColor: action.border, backgroundColor: action.bg },
                     ]}
+                    onPress={() => postMessage(action.label)}
                   >
-                    {action.label}
-                  </Text>
+                    <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={28} color={action.border} />
+                    <Text
+                      style={[
+                        styles.quickText,
+                        styles.quickResponseText,
+                        isSmall && styles.quickTextSmall,
+                        { color: action.border },
+                      ]}
+                    >
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.quickBtn, isSmall && styles.quickBtnSmall, styles.spellerToggle]}
+                  onPress={() => setShowSpeller(true)}
+                  activeOpacity={0.82}
+                >
+                  <Ionicons name="create" size={24} color={Colors.primary} />
+                  <Text style={[styles.quickText, styles.spellerToggleText, isSmall && styles.quickTextSmall]}>Type (Speller)</Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[styles.quickBtn, isSmall && styles.quickBtnSmall, styles.spellerToggle]}
-                onPress={() => setShowSpeller(true)}
-                activeOpacity={0.82}
-              >
-              <Ionicons name="create" size={24} color={Colors.primary} />
-              <Text style={[styles.quickText, styles.spellerToggleText, isSmall && styles.quickTextSmall]}>Type (Speller)</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            )}
 
             <View style={[styles.composer, isSmall && styles.composerSmall]}>
               <TextInput
@@ -289,19 +294,21 @@ export default function TelegramSender() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerLabel}>Auto-scan active</Text>
-              <View style={styles.scanDots}>
-                <View style={[styles.dot, styles.dotOn]} />
-                <View style={[styles.dot, styles.dotOn]} />
-                <View style={styles.dot} />
-                <View style={styles.dot} />
+            {!isCaregiver && (
+              <View style={styles.footer}>
+                <Text style={styles.footerLabel}>Auto-scan active</Text>
+                <View style={styles.scanDots}>
+                  <View style={[styles.dot, styles.dotOn]} />
+                  <View style={[styles.dot, styles.dotOn]} />
+                  <View style={styles.dot} />
+                  <View style={styles.dot} />
+                </View>
               </View>
-            </View>
+            )}
           </View>
         )}
 
-        {showSpeller && (
+        {!isCaregiver && showSpeller && (
           <View style={styles.spellerOverlay}>
             <View style={styles.spellerOverlayHeader}>
               <Text style={styles.spellerTitle}>BCI Speller</Text>

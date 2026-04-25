@@ -46,6 +46,8 @@ export default function TelegramSender() {
   const [chat, setChat] = useState<ChatItem[]>([]);
 
   const canSend = message.trim().length > 0 && !loading;
+  const latestChatItem = chat.length > 0 ? chat[chat.length - 1] : null;
+  const showPlayingCard = latestChatItem?.author === 'incoming';
 
   const stateLabel = useMemo(() => {
     if (lastStatus === 'success') return 'Status: Calm';
@@ -137,7 +139,7 @@ export default function TelegramSender() {
             </View>
           ))}
 
-          {lastStatus === 'success' && (
+          {showPlayingCard && (
             <View style={styles.voiceCard}>
               <Text style={styles.voiceIcon}>🔊</Text>
               <Text style={styles.voiceTitle}>Playing...</Text>

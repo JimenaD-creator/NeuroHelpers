@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Pressable
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 
 interface SettingRowProps {
   label: string;
@@ -10,6 +11,7 @@ interface SettingRowProps {
   onPress?: () => void;
   showChevron?: boolean;
 }
+
 
 function SettingRow({ label, value, onPress, showChevron = true }: SettingRowProps) {
   return (
@@ -29,6 +31,7 @@ function SettingRow({ label, value, onPress, showChevron = true }: SettingRowPro
 
 export default function SettingsScreen() {
   const { settings, setSettings } = useApp();
+  const {logout} = useAuth();
 
   const handleVoiceToggle = (value: boolean) => {
     setSettings({ ...settings, voiceEnabled: value });
@@ -129,6 +132,21 @@ export default function SettingsScreen() {
           <SettingRow label="About the app" />
         </View>
       </View>
+      <TouchableOpacity
+        style={{
+          marginTop: 24,
+          minHeight: 44,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#fff',
+        }}
+        onPress={logout}
+      >
+        <Text style={{ color: '#DC2626', fontWeight: '700' }}>Log out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

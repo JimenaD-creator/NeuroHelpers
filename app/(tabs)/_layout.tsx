@@ -1,8 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TabsLayout() {
+  const { role } = useAuth();
+  const isCaregiver = role === 'caregiver';
   return (
     <Tabs
       screenOptions={{
@@ -19,14 +22,9 @@ export default function TabsLayout() {
           fontSize: 12,
           fontWeight: '500',
         },
-        headerStyle: {
-          backgroundColor: '#FFF1A8',
-        },
+        headerStyle: { backgroundColor: '#FFF1A8' },
         headerTintColor: '#B77900',
-        headerTitleStyle: {
-          color: '#B77900',
-          fontWeight: '700',
-        },
+        headerTitleStyle: { color: '#B77900', fontWeight: '700' },
         headerTitleAlign: 'center',
         headerShadowVisible: false,
       }}
@@ -34,54 +32,28 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          href: isCaregiver ? null : '/(tabs)',
           title: 'Home',
           headerTitle: 'Current status',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-          headerLeft: () => (
-            <Ionicons 
-              name="menu" 
-              size={24} 
-              color="#B77900" 
-              style={{ marginLeft: 16 }} 
-            />
-          ),
-          headerRight: () => (
-            <Ionicons 
-              name="settings-outline" 
-              size={24} 
-              color="#B77900" 
-              style={{ marginRight: 16 }} 
-            />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="communication"
         options={{
+          href: isCaregiver ? null : undefined,
           title: 'Chat',
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="contacts"
         options={{
-          title: 'Contacts',
-          headerTitle: 'Contacts',
+          title: isCaregiver ? 'Care' : 'Contacts',
+          headerTitle: isCaregiver ? 'Caregiver console' : 'Contacts',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
-          ),
-          headerRight: () => (
-            <Ionicons 
-              name="add" 
-              size={28} 
-              color="#B77900" 
-              style={{ marginRight: 16 }} 
-            />
+            <Ionicons name={isCaregiver ? 'pulse-outline' : 'people-outline'} size={size} color={color} />
           ),
         }}
       />
@@ -90,9 +62,7 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           headerTitle: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cog-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="cog-outline" size={size} color={color} />,
         }}
       />
     </Tabs>

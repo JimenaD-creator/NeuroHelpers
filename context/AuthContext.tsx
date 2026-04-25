@@ -10,6 +10,7 @@ type AuthContextType = {
   role: UserRole | null;
   login: (role: UserRole, pin: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  switchRole: (role: UserRole) => void;
 };
 
 const STORAGE_KEY = 'nh_auth_session_v1';
@@ -78,6 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await safeRemoveItem(STORAGE_KEY);
   };
 
+  const switchRole = (nextRole: UserRole) => {
+    setRole(nextRole);
+    safeSetItem(STORAGE_KEY, JSON.stringify({ role: nextRole }));
+  };
+
   const value = useMemo<AuthContextType>(
     () => ({
       isBootstrapping,
@@ -85,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       login,
       logout,
+      switchRole,
     }),
     [isBootstrapping, role]
   );

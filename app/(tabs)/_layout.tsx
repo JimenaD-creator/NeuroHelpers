@@ -41,7 +41,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="communication"
         options={{
-          href: isCaregiver ? null : undefined,
           title: 'Chat',
           headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles-outline" size={size} color={color} />,

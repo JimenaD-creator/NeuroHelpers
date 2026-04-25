@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -23,9 +23,9 @@ export default function HomeScreen() {
   const stateColors = getEmotionalStateColor(emotionalState);
   
   const emotionalStateLabels = {
-    calmado: 'Calmado',
-    estres: 'Estrés',
-    panico: 'Pánico',
+    calmado: 'Calm',
+    estres: 'Stress',
+    panico: 'Panic',
   };
 
   // Show panic dialog when panic state is detected
@@ -41,18 +41,18 @@ export default function HomeScreen() {
   };
 
   const handleSendMessage = () => {
-    router.push('/communication');
+    router.push('/telegram-sender');
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* BCI Connection Status */}
       <View style={styles.connectionStatus}>
-        <Text style={styles.connectionLabel}>Conexión BCI</Text>
+        <Text style={styles.connectionLabel}>BCI connection</Text>
         <View style={styles.connectionIndicator}>
           <View style={[styles.connectionDot, { backgroundColor: isConnected ? Colors.success : Colors.danger }]} />
           <Text style={[styles.connectionText, { color: isConnected ? Colors.success : Colors.danger }]}>
-            {isConnected ? 'Conectado' : 'Desconectado'}
+            {isConnected ? 'Connected' : 'Disconnected'}
           </Text>
         </View>
       </View>
@@ -60,7 +60,7 @@ export default function HomeScreen() {
       {/* Brain Icon with Emotional State */}
       <View style={styles.brainContainer}>
         <BrainIcon state={emotionalState} size={140} />
-        <Text style={styles.stateLabel}>Estado emocional detectado</Text>
+        <Text style={styles.stateLabel}>Detected emotional state</Text>
         <View style={styles.stateRow}>
           <Text style={[styles.stateValue, { color: stateColors.primary }]}>
             {emotionalStateLabels[emotionalState]}
@@ -77,7 +77,7 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="warning" size={24} color={Colors.white} />
-          <Text style={styles.emergencyButtonText}>EMERGENCIA</Text>
+          <Text style={styles.emergencyButtonText}>EMERGENCY</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -86,7 +86,7 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="chatbubble" size={24} color={Colors.white} />
-          <Text style={styles.messageButtonText}>ENVIAR MENSAJE</Text>
+          <Text style={styles.messageButtonText}>SEND MESSAGE</Text>
         </TouchableOpacity>
       </View>
 
@@ -97,9 +97,11 @@ export default function HomeScreen() {
             <View style={styles.contactAvatar}>
               <Ionicons name="person" size={20} color={Colors.primary} />
             </View>
-            <View>
-              <Text style={styles.contactLabel}>Contacto principal</Text>
-              <Text style={styles.contactName}>{primaryContact.name}</Text>
+            <View style={styles.contactTextWrap}>
+              <Text style={styles.contactLabel}>Primary contact</Text>
+              <Text style={styles.contactName} numberOfLines={1} ellipsizeMode="tail">
+                {primaryContact.name}
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.voiceButton}>
@@ -108,7 +110,7 @@ export default function HomeScreen() {
               size={24} 
               color={Colors.textSecondary} 
             />
-            <Text style={styles.voiceText}>Voz activada</Text>
+            <Text style={styles.voiceText}>Voice enabled</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -125,7 +127,7 @@ export default function HomeScreen() {
 
       {/* BCI Demo Controls - For testing, remove in production */}
       <BCIDemoControls />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -133,7 +135,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   connectionStatus: {
     alignItems: 'center',
@@ -212,7 +218,7 @@ const styles = StyleSheet.create({
   },
   contactContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingVertical: Spacing.lg,
     borderTopWidth: 1,
@@ -224,6 +230,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    flex: 1,
+    minWidth: 0,
+    paddingRight: Spacing.sm,
+  },
+  contactTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   contactAvatar: {
     width: 40,
@@ -245,9 +258,15 @@ const styles = StyleSheet.create({
   voiceButton: {
     alignItems: 'center',
     gap: Spacing.xs,
+    minWidth: 92,
+    maxWidth: 92,
+    alignSelf: 'center',
+    marginLeft: Spacing.md,
+    flexShrink: 0,
   },
   voiceText: {
     fontSize: FontSize.xs,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
 });

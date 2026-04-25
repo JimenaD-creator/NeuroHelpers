@@ -5,121 +5,69 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
 
-interface QuickMessageButtonProps {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  color: string;
-  bgColor: string;
-  onPress: () => void;
-}
-
-function QuickMessageButton({ icon, label, color, bgColor, onPress }: QuickMessageButtonProps) {
-  return (
-    <TouchableOpacity 
-      style={[styles.quickButton, { backgroundColor: bgColor }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Ionicons name={icon} size={32} color={color} />
-      <Text style={[styles.quickButtonText, { color }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 export default function CommunicationScreen() {
   const router = useRouter();
-  const { messages, sendQuickMessage, setCurrentPlayingMessage, triggerEmergency } = useApp();
-  
-  const receivedMessage = messages.find(m => m.type === 'received');
+  const { contacts, messages } = useApp();
 
-  const handlePlayMessage = () => {
-    if (receivedMessage) {
-      setCurrentPlayingMessage(receivedMessage);
-      router.push('/message-playback');
-    }
-  };
-
-  const handleEmergency = () => {
-    sendQuickMessage('emergencia');
-    router.push('/emergency');
-  };
+  const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const chats = contacts.map((contact, index) => {
+    const fallbackMessage =
+      index % 2 === 0
+        ? { text: 'I am on my way.', type: 'received' as const, timestamp: '10:30 AM' }
+        : { text: 'Do you need help?', type: 'received' as const, timestamp: '10:31 AM' };
+    const message = latestMessage ?? fallbackMessage;
+    return {
+      id: contact.id,
+      name: contact.name,
+      isPrimary: contact.isPrimary,
+      lastMessage: message.text,
+      timestamp: message.timestamp,
+      type: message.type,
+      unread: message.type === 'received' && index === 0,
+    };
+  });
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Quick Messages Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mensajes rápidos</Text>
-        <View style={styles.quickMessagesRow}>
-          <QuickMessageButton
-            icon="thumbs-up"
-            label="Estoy bien"
-            color={Colors.success}
-            bgColor={Colors.successLight}
-            onPress={() => sendQuickMessage('bien')}
-          />
-          <QuickMessageButton
-            icon="hand-left"
-            label="Necesito ayuda"
-            color={Colors.warning}
-            bgColor={Colors.warningLight}
-            onPress={() => sendQuickMessage('ayuda')}
-          />
-          <QuickMessageButton
-            icon="warning"
-            label="Emergencia"
-            color={Colors.emergency}
-            bgColor={Colors.emergencyLight}
-            onPress={handleEmergency}
-          />
-        </View>
-      </View>
-
-      {/* Received Message Section */}
-      {receivedMessage && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mensaje recibido</Text>
-          <View style={styles.messageCard}>
-            <View style={styles.messageContent}>
-              <Text style={styles.messageText}>{receivedMessage.text}</Text>
-              <Text style={styles.messageTime}>{receivedMessage.timestamp}</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.playButton}
-              onPress={handlePlayMessage}
+        <Text style={styles.sectionTitle}>Chats</Text>
+        <View style={styles.chatList}>
+          {chats.map((chat) => (
+            <TouchableOpacity
+              key={chat.id}
+              style={[styles.chatRow, chat.isPrimary && styles.chatRowPrimary]}
               activeOpacity={0.8}
+              onPress={() => router.push('/telegram-sender')}
             >
-              <Ionicons name="play" size={24} color={Colors.primary} />
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.chatBody}>
+                <View style={styles.chatHeaderRow}>
+                  <View style={styles.chatNameRow}>
+                    <Text style={styles.chatName}>{chat.name}</Text>
+                    {chat.isPrimary && (
+                      <View style={styles.primaryBadge}>
+                        <Text style={styles.primaryBadgeText}>PRIMARY</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.chatTime}>{chat.timestamp}</Text>
+                </View>
+                <View style={styles.chatMessageRow}>
+                  <Ionicons
+                    name={chat.type === 'sent' ? 'checkmark-done' : 'arrow-down-circle'}
+                    size={14}
+                    color={chat.type === 'sent' ? Colors.primary : Colors.textMuted}
+                  />
+                  <Text style={styles.chatMessage} numberOfLines={1}>
+                    {chat.lastMessage}
+                  </Text>
+                </View>
+              </View>
+              {chat.unread && <View style={styles.unreadDot} />}
             </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Voice Message Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Escuchar mensaje</Text>
-        <View style={styles.voiceMessageCard}>
-          <TouchableOpacity 
-            style={styles.voicePlayButton}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="play" size={24} color={Colors.primary} />
-          </TouchableOpacity>
-          <View style={styles.waveformContainer}>
-            {/* Waveform visualization */}
-            {Array.from({ length: 30 }).map((_, i) => (
-              <View 
-                key={i} 
-                style={[
-                  styles.waveformBar,
-                  { 
-                    height: Math.random() * 20 + 5,
-                    backgroundColor: i < 10 ? Colors.primary : Colors.border,
-                  }
-                ]} 
-              />
-            ))}
-          </View>
-          <Text style={styles.voiceDuration}>0:12</Text>
+          ))}
         </View>
       </View>
     </ScrollView>
@@ -143,81 +91,86 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: Spacing.md,
   },
-  quickMessagesRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  quickButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.lg,
+  chatList: {
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
     gap: Spacing.sm,
   },
-  quickButtonText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.medium,
-    textAlign: 'center',
+  chatRowPrimary: {
+    backgroundColor: '#EEF2FF',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
   },
-  messageCard: {
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  chatHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  chatNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    gap: Spacing.md,
+    gap: 6,
+    flexShrink: 1,
   },
-  messageContent: {
-    flex: 1,
-  },
-  messageText: {
+  chatName: {
     fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
     color: Colors.text,
-    marginBottom: Spacing.xs,
   },
-  messageTime: {
+  primaryBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  primaryBadgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.3,
+  },
+  chatTime: {
     fontSize: FontSize.xs,
     color: Colors.textMuted,
   },
-  playButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voiceMessageCard: {
+  chatMessageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    gap: Spacing.md,
+    gap: 6,
   },
-  voicePlayButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waveformContainer: {
+  chatMessage: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    height: 30,
-  },
-  waveformBar: {
-    width: 3,
-    borderRadius: 1.5,
-  },
-  voiceDuration: {
     fontSize: FontSize.sm,
     color: Colors.textSecondary,
-    minWidth: 35,
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.success,
   },
 });

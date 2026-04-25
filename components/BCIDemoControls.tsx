@@ -47,20 +47,20 @@ export function BCIDemoControls() {
         >
           <View style={styles.panel}>
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Simulador BCI</Text>
+              <Text style={styles.panelTitle}>BCI Simulator</Text>
               <View style={styles.connectionStatus}>
                 <View style={[
                   styles.statusDot,
                   { backgroundColor: isConnected ? Colors.success : Colors.danger }
                 ]} />
                 <Text style={styles.statusText}>
-                  {isConnected ? 'Conectado' : 'Desconectado'}
+                  {isConnected ? 'Connected' : 'Disconnected'}
                 </Text>
               </View>
             </View>
 
             <Text style={styles.panelSubtitle}>
-              Simula estados emocionales detectados por el dispositivo BCI
+              Simulate emotional states detected by the BCI device
             </Text>
 
             <View style={styles.buttonsContainer}>
@@ -74,7 +74,7 @@ export function BCIDemoControls() {
               >
                 <Ionicons name="happy" size={32} color={Colors.success} />
                 <Text style={[styles.stateButtonText, { color: Colors.success }]}>
-                  Calmado
+                  Calm
                 </Text>
               </TouchableOpacity>
 
@@ -88,7 +88,7 @@ export function BCIDemoControls() {
               >
                 <Ionicons name="alert-circle" size={32} color={Colors.warning} />
                 <Text style={[styles.stateButtonText, { color: Colors.warning }]}>
-                  Estrés
+                  Stress
                 </Text>
               </TouchableOpacity>
 
@@ -102,7 +102,7 @@ export function BCIDemoControls() {
               >
                 <Ionicons name="warning" size={32} color={Colors.danger} />
                 <Text style={[styles.stateButtonText, { color: Colors.danger }]}>
-                  Pánico
+                  Panic
                 </Text>
               </TouchableOpacity>
             </View>
@@ -112,7 +112,7 @@ export function BCIDemoControls() {
               onPress={() => setIsOpen(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.closeButtonText}>Cerrar</Text>
+              <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -124,7 +124,7 @@ export function BCIDemoControls() {
 const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 600,
     right: 20,
     width: 56,
     height: 56,

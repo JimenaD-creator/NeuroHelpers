@@ -67,9 +67,9 @@ interface AppContextType {
 }
 
 const defaultContacts: Contact[] = [
-  { id: '1', name: 'Mamá', phone: '+51 987 654 321', isPrimary: true },
-  { id: '2', name: 'Cuidador', phone: '+51 912 345 678', isPrimary: false },
-  { id: '3', name: 'Hermano', phone: '+51 923 456 789', isPrimary: false },
+  { id: '1', name: 'Mom', phone: '+51 987 654 321', isPrimary: true },
+  { id: '2', name: 'Caregiver', phone: '+51 912 345 678', isPrimary: false },
+  { id: '3', name: 'Brother', phone: '+51 923 456 789', isPrimary: false },
 ];
 
 const defaultSettings: Settings = {
@@ -150,9 +150,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const sendQuickMessage = (type: 'bien' | 'ayuda' | 'emergencia') => {
     const messageTexts = {
-      bien: 'Estoy bien',
-      ayuda: 'Necesito ayuda',
-      emergencia: '¡EMERGENCIA!',
+      bien: "I'm okay",
+      ayuda: 'I need help',
+      emergencia: 'EMERGENCY!',
     };
     
     const newMessage: Message = {

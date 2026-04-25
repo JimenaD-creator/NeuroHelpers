@@ -20,20 +20,22 @@ export default function TabsLayout() {
           fontWeight: '500',
         },
         headerStyle: {
-          backgroundColor: Colors.white,
+          backgroundColor: '#FFF1A8',
         },
+        headerTintColor: '#B77900',
         headerTitleStyle: {
-          color: Colors.text,
-          fontWeight: '600',
+          color: '#B77900',
+          fontWeight: '700',
         },
+        headerTitleAlign: 'center',
         headerShadowVisible: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inicio',
-          headerTitle: 'Estado actual',
+          title: 'Home',
+          headerTitle: 'Current status',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -41,7 +43,7 @@ export default function TabsLayout() {
             <Ionicons 
               name="menu" 
               size={24} 
-              color={Colors.text} 
+              color="#B77900" 
               style={{ marginLeft: 16 }} 
             />
           ),
@@ -49,7 +51,7 @@ export default function TabsLayout() {
             <Ionicons 
               name="settings-outline" 
               size={24} 
-              color={Colors.text} 
+              color="#B77900" 
               style={{ marginRight: 16 }} 
             />
           ),
@@ -58,8 +60,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="communication"
         options={{
-          title: 'Comunicación',
-          headerTitle: 'Comunicación',
+          title: 'Communication',
+          headerTitle: 'Communication',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
@@ -67,7 +69,7 @@ export default function TabsLayout() {
             <Ionicons 
               name="mic-outline" 
               size={24} 
-              color={Colors.text} 
+              color="#B77900" 
               style={{ marginRight: 16 }} 
             />
           ),
@@ -76,8 +78,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="contacts"
         options={{
-          title: 'Contactos',
-          headerTitle: 'Contactos',
+          title: 'Contacts',
+          headerTitle: 'Contacts',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -85,7 +87,7 @@ export default function TabsLayout() {
             <Ionicons 
               name="add" 
               size={28} 
-              color={Colors.text} 
+              color="#B77900" 
               style={{ marginRight: 16 }} 
             />
           ),
@@ -94,8 +96,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Ajustes',
-          headerTitle: 'Ajustes',
+          title: 'Settings',
+          headerTitle: 'Settings',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cog-outline" size={size} color={color} />
           ),

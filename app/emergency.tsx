@@ -56,8 +56,8 @@ export default function EmergencyScreen() {
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>¡EMERGENCIA ACTIVADA!</Text>
-        <Text style={styles.subtitle}>Enviando alerta a:</Text>
+        <Text style={styles.title}>EMERGENCY ACTIVATED!</Text>
+        <Text style={styles.subtitle}>Sending alert to:</Text>
 
         {/* Status List */}
         <View style={styles.statusList}>

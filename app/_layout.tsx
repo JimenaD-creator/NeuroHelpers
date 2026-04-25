@@ -20,7 +20,7 @@ export default function RootLayout() {
           options={{ 
             presentation: 'modal',
             headerShown: true,
-            headerTitle: 'Reproduciendo mensaje',
+            headerTitle: 'Playing message',
           }} 
         />
       </Stack>

@@ -39,9 +39,9 @@ export default function SettingsScreen() {
   };
 
   const sensitivityLabels = {
-    baja: 'Baja',
-    media: 'Media',
-    alta: 'Alta',
+    baja: 'Low',
+    media: 'Medium',
+    alta: 'High',
   };
 
   const cycleSensitivity = () => {
@@ -55,11 +55,11 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Voice Configuration */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Configuración de voz</Text>
+        <Text style={styles.sectionTitle}>Voice settings</Text>
         
         <View style={styles.card}>
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Voz activada</Text>
+            <Text style={styles.settingLabel}>Voice enabled</Text>
             <Switch
               value={settings.voiceEnabled}
               onValueChange={handleVoiceToggle}
@@ -69,7 +69,7 @@ export default function SettingsScreen() {
           </View>
           
           <View style={styles.volumeContainer}>
-            <Text style={styles.settingLabel}>Volumen</Text>
+            <Text style={styles.settingLabel}>Volume</Text>
             <View style={styles.volumeRow}>
               <Pressable onPress={() => handleVolumeChange(Math.max(0, settings.volume - 0.1))}>
                 <Ionicons name="volume-low" size={20} color={Colors.textSecondary} />
@@ -108,11 +108,11 @@ export default function SettingsScreen() {
 
       {/* BCI Sensitivity */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sensibilidad BCI</Text>
+        <Text style={styles.sectionTitle}>BCI sensitivity</Text>
         
         <View style={styles.card}>
           <SettingRow
-            label="Nivel de detección"
+            label="Detection level"
             value={sensitivityLabels[settings.bciSensitivity]}
             onPress={cycleSensitivity}
           />
@@ -121,12 +121,12 @@ export default function SettingsScreen() {
 
       {/* Other Options */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Otras opciones</Text>
+        <Text style={styles.sectionTitle}>Other options</Text>
         
         <View style={styles.card}>
           <SettingRow label="Tutorial" />
           <View style={styles.separator} />
-          <SettingRow label="Acerca de la app" />
+          <SettingRow label="About the app" />
         </View>
       </View>
     </ScrollView>

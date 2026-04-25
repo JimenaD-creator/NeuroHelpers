@@ -25,7 +25,7 @@ export default function MessagePlaybackScreen() {
       <Stack.Screen 
         options={{
           headerShown: true,
-          headerTitle: 'Reproduciendo mensaje',
+          headerTitle: 'Playing message',
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={24} color={Colors.text} />
@@ -58,7 +58,7 @@ export default function MessagePlaybackScreen() {
 
           {/* Message Content */}
           <View style={styles.messageContainer}>
-            <Text style={styles.messageLabel}>Mensaje</Text>
+            <Text style={styles.messageLabel}>Message</Text>
             <View style={styles.messageCard}>
               <Text style={styles.messageText}>{currentPlayingMessage.text}</Text>
               <Text style={styles.messageTime}>{currentPlayingMessage.timestamp}</Text>
@@ -74,7 +74,7 @@ export default function MessagePlaybackScreen() {
             <View style={styles.stopIcon}>
               <View style={styles.stopSquare} />
             </View>
-            <Text style={styles.stopButtonText}>DETENER</Text>
+            <Text style={styles.stopButtonText}>STOP</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

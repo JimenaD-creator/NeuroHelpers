@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp, Contact } from '@/context/AppContext';
@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, BorderRadius, FontSize, FontWeight } from '@/constants/theme';
 import { BrainIcon } from '@/components/BrainIcon';
+import { markRealtimeMessagesAsRead, subscribeRealtimeMessages } from '@/services/realtimeChat';
 
 interface ContactItemProps {
   contact: Contact;
@@ -44,6 +45,46 @@ export default function ContactsScreen() {
   const { role } = useAuth();
   const { contacts, setContacts, emotionalState, isConnected } = useApp();
   const isCaregiver = role === 'caregiver';
+  const [incomingCount, setIncomingCount] = useState(0);
+  useEffect(() => {
+    if (!isCaregiver) return;
+    const unsubscribe = subscribeRealtimeMessages('caregiver', (messages) => {
+      const unread = messages.filter(
+        (m) => m.toRole === 'caregiver' && m.fromRole === 'patient' && !m.readByCaregiver
+      );
+      setIncomingCount(unread.length);
+    });
+    return () => unsubscribe();
+  }, [isCaregiver]);
+
+  const hasUnreadAlerts = incomingCount > 0;
+
+  const alertBannerUi = useMemo(
+    () =>
+      hasUnreadAlerts
+        ? {
+            title: 'Alert Messages Pending',
+            body: `You have ${incomingCount} unread message${incomingCount > 1 ? 's' : ''}. Review now.`,
+            iconColor: '#B91C1C',
+          }
+        : {
+            title: 'Priority Alert Area',
+            body: 'No emergency alert right now. New alerts will appear here immediately.',
+            iconColor: '#92400E',
+          },
+    [hasUnreadAlerts, incomingCount]
+  );
+
+  const handleOpenMessages = async () => {
+    setIncomingCount(0);
+    try {
+      await markRealtimeMessagesAsRead('caregiver');
+    } catch {
+      // Ignore read-mark failures in demo mode.
+    }
+    router.push('/(tabs)/communication');
+  };
+
 
   const handleContactPress = (contact: Contact) => {
     // Toggle primary contact
@@ -51,6 +92,7 @@ export default function ContactsScreen() {
       ...c,
       isPrimary: c.id === contact.id,
     })));
+    router.push('/(tabs)/communication');
   };
 
   if (isCaregiver) {
@@ -78,17 +120,25 @@ export default function ContactsScreen() {
           <Text style={styles.stateValue}>{emotionalStateLabels[emotionalState]}</Text>
         </View>
 
-        <View style={styles.alertBanner}>
-          <Ionicons name="warning" size={20} color="#92400E" />
+        <View style={[styles.alertBanner, hasUnreadAlerts && styles.alertBannerHot]}>
+          <Ionicons name="warning" size={20} color={alertBannerUi.iconColor} />
           <View style={styles.alertBody}>
-            <Text style={styles.alertTitle}>Priority Alert Area</Text>
-            <Text style={styles.alertText}>No emergency alert right now. New alerts will appear here immediately.</Text>
+            <Text style={[styles.alertTitle, hasUnreadAlerts && styles.alertTitleHot]}>{alertBannerUi.title}</Text>
+            <Text style={[styles.alertText, hasUnreadAlerts && styles.alertTextHot]}>{alertBannerUi.body}</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.primaryAction} onPress={() => router.push('/(tabs)/communication')}>
+        <TouchableOpacity
+          style={[styles.primaryAction, hasUnreadAlerts && styles.primaryActionHot]}
+          onPress={handleOpenMessages}
+        >
           <Ionicons name="chatbubble-ellipses" size={24} color={Colors.white} />
-          <Text style={styles.primaryActionText}>SEND MESSAGE</Text>
+          <Text style={styles.primaryActionText}>Messages</Text>
+          {hasUnreadAlerts ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{incomingCount > 99 ? '99+' : String(incomingCount)}</Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
 
         <View style={styles.careCard}>
@@ -184,6 +234,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
   },
+  alertBannerHot: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#DC2626',
+  },
   alertBody: {
     flex: 1,
   },
@@ -196,6 +250,12 @@ const styles = StyleSheet.create({
   alertText: {
     color: '#7C2D12',
     fontSize: FontSize.sm,
+  },
+  alertTitleHot: {
+    color: '#991B1B',
+  },
+  alertTextHot: {
+    color: '#7F1D1D',
   },
   careCard: {
     backgroundColor: Colors.white,
@@ -257,10 +317,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  primaryActionHot: {
+    backgroundColor: '#DC2626',
+    borderWidth: 2,
+    borderColor: '#991B1B',
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
   primaryActionText: {
     color: Colors.white,
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+  },
+  unreadBadge: {
+    marginLeft: 10,
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#DC2626',
+  },
+  unreadBadgeText: {
+    color: '#DC2626',
+    fontWeight: FontWeight.bold,
+    fontSize: 15,
   },
   listContent: {
     paddingVertical: Spacing.md,

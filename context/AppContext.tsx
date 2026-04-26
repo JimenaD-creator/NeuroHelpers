@@ -70,9 +70,7 @@ interface AppContextType {
 }
 
 const defaultContacts: Contact[] = [
-  { id: '1', name: 'Mom', phone: '+51 987 654 321', isPrimary: true },
-  { id: '2', name: 'Caregiver', phone: '+51 912 345 678', isPrimary: false },
-  { id: '3', name: 'Brother', phone: '+51 923 456 789', isPrimary: false },
+  { id: '1', name: 'Caregiver', phone: '+51 912 345 678', isPrimary: true },
 ];
 
 const defaultSettings: Settings = {
@@ -102,17 +100,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const pendingEmergencyChatTextRef = useRef<string | null>(null);
   const panicEmergencyLockRef = useRef(false);
-
-  useEffect(() => {
-    const states: EmotionalState[] = ['calmado', 'estres', 'panico'];
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx = (idx + 1) % states.length;
-      setEmotionalState(states[idx]);
-    }, 7000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (emotionalState !== 'panico') {

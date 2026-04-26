@@ -8,12 +8,14 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, getEmotionalStateC
 import { BrainIcon } from '@/components/BrainIcon';
 import { PanicDialog } from '@/components/PanicDialog';
 import { BCIDemoControls } from '@/components/BCIDemoControls';
+import { subscribeRealtimeMessages } from '@/services/realtimeChat';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { role } = useAuth();
   const [isSendingEmergency, setIsSendingEmergency] = useState(false);
   const [showEmergencyErrorModal, setShowEmergencyErrorModal] = useState(false);
+  const [patientUnreadCount, setPatientUnreadCount] = useState(0);
   const autoEmergencyTriggeredRef = useRef(false);
   const { 
     emotionalState, 
@@ -45,6 +47,17 @@ export default function HomeScreen() {
     autoEmergencyTriggeredRef.current = true;
     handleEmergencyTap();
   }, [emotionalState, isPatient]);
+
+  useEffect(() => {
+    if (!isPatient) return;
+    const unsubscribe = subscribeRealtimeMessages('patient', (messages) => {
+      const unread = messages.filter(
+        (m) => m.toRole === 'patient' && m.fromRole === 'caregiver' && !m.readByPatient
+      );
+      setPatientUnreadCount(unread.length);
+    });
+    return () => unsubscribe();
+  }, [isPatient]);
 
   const validateEmergencySend = async () => {
     // For MVP: treat a registered primary contact with phone as successful delivery validation.
@@ -116,7 +129,12 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="chatbubble" size={24} color={Colors.white} />
-          <Text style={styles.messageButtonText}>SEND MESSAGE</Text>
+          <Text style={styles.messageButtonText}>Messages</Text>
+          {isPatient && patientUnreadCount > 0 ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{patientUnreadCount > 99 ? '99+' : String(patientUnreadCount)}</Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
 
@@ -230,11 +248,35 @@ const styles = StyleSheet.create({
   },
   messageButton: {
     backgroundColor: Colors.primary,
+    borderWidth: 2,
+    borderColor: '#4338CA',
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
   },
   messageButtonText: {
     color: Colors.white,
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
+  },
+  unreadBadge: {
+    marginLeft: 10,
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  unreadBadgeText: {
+    color: Colors.primary,
+    fontWeight: FontWeight.bold,
+    fontSize: 15,
   },
   modalBackdrop: {
     flex: 1,

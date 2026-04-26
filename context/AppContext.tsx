@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, ReactNode, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { publishEmotionalState, subscribeEmotionalState } from '@/services/realtimeState';
 
 export type EmotionalState = 'calmado' | 'estres' | 'panico';
 
@@ -36,6 +38,8 @@ interface AppContextType {
   setEmotionalState: (state: EmotionalState) => void;
   isConnected: boolean;
   setIsConnected: (connected: boolean) => void;
+  isPatientChatOpen: boolean;
+  setIsPatientChatOpen: (open: boolean) => void;
   
   // Emergency
   isEmergencyActive: boolean;
@@ -83,8 +87,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const EMOTIONAL_STATE_CYCLE_MS = 8000;
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { role } = useAuth();
+  const isPatient = role === 'patient';
   const [emotionalState, setEmotionalState] = useState<EmotionalState>('calmado');
   const [isConnected, setIsConnected] = useState(true);
+  const [isPatientChatOpen, setIsPatientChatOpen] = useState(false);
   const [isEmergencyActive, setIsEmergencyActive] = useState(false);
   const [showPanicDialog, setShowPanicDialog] = useState(false);
   const [alertStatus, setAlertStatus] = useState<AlertStatus>({
@@ -103,6 +110,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const panicEmergencyLockRef = useRef(false);
 
   useEffect(() => {
+    // Patient acts as the source of truth for state generation.
+    if (isPatient) return;
+    const unsubscribe = subscribeEmotionalState((next) => {
+      setEmotionalState(next);
+    });
+    return () => unsubscribe();
+  }, [isPatient]);
+
+  useEffect(() => {
+    if (!isPatient) return;
+    publishEmotionalState(emotionalState).catch(() => {
+      // Ignore transient sync errors in demo mode.
+    });
+  }, [emotionalState, isPatient]);
+
+  useEffect(() => {
+    if (!isPatient) return;
     const cycle: EmotionalState[] = ['calmado', 'estres', 'panico'];
     const interval = setInterval(() => {
       setEmotionalState((prev) => {
@@ -113,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, EMOTIONAL_STATE_CYCLE_MS);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isPatient]);
 
   useEffect(() => {
     if (emotionalState !== 'panico') {
@@ -209,6 +233,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setEmotionalState,
         isConnected,
         setIsConnected,
+        isPatientChatOpen,
+        setIsPatientChatOpen,
         isEmergencyActive,
         setIsEmergencyActive,
         alertStatus,

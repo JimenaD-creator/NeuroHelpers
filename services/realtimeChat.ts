@@ -20,6 +20,7 @@ export type RealtimeChatMessage = {
   fromRole: ChatRole;
   toRole: ChatRole;
   createdAt: Date;
+  clientMessageId: string | null;
   readByPatient: boolean;
   readByCaregiver: boolean;
 };
@@ -28,6 +29,7 @@ type FirestoreChatMessage = {
   text: string;
   fromRole: ChatRole;
   toRole: ChatRole;
+  clientMessageId?: string;
   createdAt?: Timestamp;
   roomId?: string;
   readByPatient?: boolean;
@@ -37,7 +39,7 @@ type FirestoreChatMessage = {
 const CHAT_COLLECTION = 'chat_messages';
 const CHAT_ROOM = 'default-room';
 
-export async function sendRealtimeMessage(fromRole: ChatRole, text: string) {
+export async function sendRealtimeMessage(fromRole: ChatRole, text: string, clientMessageId?: string) {
   const toRole: ChatRole = fromRole === 'patient' ? 'caregiver' : 'patient';
   const db = getFirebaseDb();
   await addDoc(collection(db, CHAT_COLLECTION), {
@@ -45,6 +47,7 @@ export async function sendRealtimeMessage(fromRole: ChatRole, text: string) {
     text,
     fromRole,
     toRole,
+    clientMessageId: clientMessageId ?? null,
     createdAt: serverTimestamp(),
     readByPatient: fromRole === 'patient',
     readByCaregiver: fromRole === 'caregiver',
@@ -101,6 +104,7 @@ export function subscribeRealtimeMessages(
           text: data.text ?? '',
           fromRole: data.fromRole,
           toRole: data.toRole,
+          clientMessageId: data.clientMessageId ?? null,
           createdAt: data.createdAt?.toDate?.() ?? new Date(0),
           readByPatient: Boolean(data.readByPatient),
           readByCaregiver: Boolean(data.readByCaregiver),

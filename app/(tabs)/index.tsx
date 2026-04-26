@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -12,21 +12,27 @@ import { sendRealtimeMessage, subscribeRealtimeMessages } from '@/services/realt
 
 export default function HomeScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { role } = useAuth();
   const [isSendingEmergency, setIsSendingEmergency] = useState(false);
   const [showEmergencyErrorModal, setShowEmergencyErrorModal] = useState(false);
   const [patientUnreadCount, setPatientUnreadCount] = useState(0);
   const autoEmergencyTriggeredRef = useRef(false);
+  const panicEmergencyHandledRef = useRef(false);
+  const lastEmergencyRealtimeSentAtRef = useRef(0);
   const { 
     emotionalState, 
     isConnected, 
+    isPatientChatOpen,
     primaryContact, 
     triggerEmergency,
     showPanicDialog,
     setShowPanicDialog,
+    queueEmergencyChatMessage,
     settings,
   } = useApp();
   const isPatient = role === 'patient';
+  const isChatScreenOpen = pathname?.includes('/communication') ?? false;
 
   const stateColors = getEmotionalStateColor(emotionalState);
   
@@ -40,13 +46,20 @@ export default function HomeScreen() {
   useEffect(() => {
     if (emotionalState !== 'panico') {
       autoEmergencyTriggeredRef.current = false;
+      panicEmergencyHandledRef.current = false;
       return;
     }
     if (!isPatient || isSendingEmergency || autoEmergencyTriggeredRef.current) return;
+    if (isPatientChatOpen || isChatScreenOpen) {
+      // While patient is inside chat, do not auto-trigger emergency flow.
+      panicEmergencyHandledRef.current = true;
+      autoEmergencyTriggeredRef.current = true;
+      return;
+    }
 
     autoEmergencyTriggeredRef.current = true;
-    handleEmergencyTap();
-  }, [emotionalState, isPatient]);
+    handleEmergencyTap('auto');
+  }, [emotionalState, isPatient, isSendingEmergency, isPatientChatOpen, isChatScreenOpen]);
 
   useEffect(() => {
     if (!isPatient) return;
@@ -66,33 +79,64 @@ export default function HomeScreen() {
     return true;
   };
 
-  const handleEmergencyTap = async () => {
+  const handleEmergencyTap = async (source: 'manual' | 'auto' = 'manual') => {
     if (isSendingEmergency) return;
+    if (source === 'auto' && emotionalState === 'panico' && panicEmergencyHandledRef.current) return;
+    if (source === 'auto' && (isPatientChatOpen || isChatScreenOpen)) {
+      panicEmergencyHandledRef.current = true;
+      return;
+    }
+    if (emotionalState === 'panico') {
+      panicEmergencyHandledRef.current = true;
+    }
+    if (source === 'auto' && emotionalState === 'panico') {
+      // Prevent repeated automatic attempts during the same panic episode.
+      panicEmergencyHandledRef.current = true;
+    }
     setIsSendingEmergency(true);
 
     const delivered = await validateEmergencySend();
-    setIsSendingEmergency(false);
 
-    if (delivered) {
-      triggerEmergency();
-      let emergencySent = false;
+    let emergencySent = false;
+    const now = Date.now();
+    const recentlySent = now - lastEmergencyRealtimeSentAtRef.current < 5000;
+    if (recentlySent) {
+      emergencySent = true;
+    } else {
       try {
         await sendRealtimeMessage('patient', 'EMERGENCY!');
         emergencySent = true;
+        lastEmergencyRealtimeSentAtRef.current = Date.now();
       } catch {
         // Retry once for unstable mobile networks.
         try {
           await sendRealtimeMessage('patient', 'EMERGENCY!');
           emergencySent = true;
+          lastEmergencyRealtimeSentAtRef.current = Date.now();
         } catch {
           emergencySent = false;
         }
       }
+    }
 
-      if (!emergencySent) {
-        Alert.alert('Emergency message failed', 'The emergency alert could not be sent to chat. Please try again.');
+    setIsSendingEmergency(false);
+
+    if (!emergencySent) {
+      Alert.alert('Emergency message failed', 'The emergency alert could not be sent to chat. Please try again.');
+    } else {
+      // Ensure the emergency message is visible in patient chat immediately.
+      queueEmergencyChatMessage('EMERGENCY!');
+      if (emotionalState === 'panico') {
+        panicEmergencyHandledRef.current = true;
       }
-      router.push('/emergency');
+    }
+
+    if (delivered) {
+      // Keep red emergency interface out while patient chat is open.
+      if (!isPatientChatOpen && !isChatScreenOpen) {
+        triggerEmergency();
+        router.push('/emergency');
+      }
       return;
     }
 
@@ -132,7 +176,7 @@ export default function HomeScreen() {
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.emergencyButton]}
-          onPress={handleEmergencyTap}
+          onPress={() => handleEmergencyTap('manual')}
           activeOpacity={0.8}
           disabled={isSendingEmergency}
         >
@@ -161,7 +205,7 @@ export default function HomeScreen() {
         onCancel={() => setShowPanicDialog(false)}
         onConfirm={() => {
           setShowPanicDialog(false);
-          handleEmergencyTap();
+          handleEmergencyTap('manual');
         }}
       />
 

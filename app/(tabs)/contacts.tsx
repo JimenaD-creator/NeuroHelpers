@@ -101,6 +101,9 @@ export default function ContactsScreen() {
       estres: 'Stress',
       panico: 'Panic',
     } as const;
+    const emergencyAlertsLabel = hasUnreadAlerts
+      ? `${incomingCount} pending alert message${incomingCount > 1 ? 's' : ''}`
+      : 'None';
 
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.caregiverContent} showsVerticalScrollIndicator={false}>
@@ -152,8 +155,10 @@ export default function ContactsScreen() {
 
           <Text style={styles.patientName}>BCI User</Text>
           <Text style={styles.patientMeta}>Connection: Stable</Text>
-          <Text style={styles.patientMeta}>Emotional state: Calm</Text>
-          <Text style={styles.patientMeta}>Emergency alerts: None</Text>
+          <Text style={styles.patientMeta}>Emotional state: {emotionalStateLabels[emotionalState]}</Text>
+          <Text style={[styles.patientMeta, hasUnreadAlerts && styles.patientMetaAlert]}>
+            Emergency alerts: {emergencyAlertsLabel}
+          </Text>
         </View>
       </ScrollView>
     );
@@ -306,6 +311,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: FontSize.sm,
     marginBottom: 4,
+  },
+  patientMetaAlert: {
+    color: Colors.emergencyDark,
+    fontWeight: FontWeight.semibold,
   },
   primaryAction: {
     marginTop: Spacing.md,

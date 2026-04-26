@@ -23,9 +23,9 @@ import { Colors } from './constants/theme';
 import { markRealtimeMessagesAsRead, sendRealtimeMessage, subscribeRealtimeMessages } from '@/services/realtimeChat';
 
 const CAREGIVER_LAST_SEEN_KEY = 'nh_caregiver_last_seen_v1';
-const LAST_AUTO_PLAYED_KEY_BY_ROLE = {
-  patient: 'nh_last_autoplayed_patient_msg_id',
-  caregiver: 'nh_last_autoplayed_caregiver_msg_id',
+const AUTO_PLAYED_IDS_KEY_BY_ROLE = {
+  patient: 'nh_autoplayed_patient_msg_ids',
+  caregiver: 'nh_autoplayed_caregiver_msg_ids',
 } as const;
 
 type ChatItem = {
@@ -33,19 +33,21 @@ type ChatItem = {
   author: 'incoming' | 'outgoing';
   text: string;
   time: string;
+  readByCurrentRole?: boolean;
   deliveryStatus?: 'sending' | 'sent' | 'read' | 'failed';
 };
 
 const QUICK_ACTIONS = [
   { id: 'ok', icon: 'thumbs-up', label: "I'm okay", border: Colors.success, bg: '#DCFCE7' },
   { id: 'help', icon: 'hand-left', label: 'I need help', border: Colors.warning, bg: '#FFF5DB' },
+  { id: 'emergency', icon: 'warning', label: 'Emergency', border: Colors.emergency, bg: '#FEE2E2' },
 ];
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
 export default function TelegramSender() {
   const { role } = useAuth();
-  const { consumePendingEmergencyChatMessage } = useApp();
+  const { emotionalState, consumePendingEmergencyChatMessage, setIsPatientChatOpen } = useApp();
   const { width } = useWindowDimensions();
   const isSmall = width < 360;
   const isMedium = width >= 360 && width < 400;
@@ -57,48 +59,80 @@ export default function TelegramSender() {
   const [lastStatus, setLastStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showSpeller, setShowSpeller] = useState(false);
   const [chat, setChat] = useState<ChatItem[]>([]);
-  const [pendingOutgoing, setPendingOutgoing] = useState<Array<ChatItem & { createdAtMs: number }>>([]);
+  const [pendingOutgoing, setPendingOutgoing] = useState<Array<ChatItem & { createdAtMs: number; clientMessageId: string }>>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingText, setSpeakingText] = useState('');
-  const [lastAutoPlayedId, setLastAutoPlayedId] = useState<string | null | undefined>(undefined);
+  const [autoPlayedIds, setAutoPlayedIds] = useState<string[] | undefined>(undefined);
   const scrollRef = useRef<ScrollView>(null);
-  const lastSpokenId = useRef<string | null>(null);
+  const isAutoPlayingQueueRef = useRef(false);
+  const panicEmergencySentRef = useRef(false);
 
   const canSend = message.trim().length > 0 && !loading;
   const showPlayingCard = isSpeaking && !isCaregiver;
   const visibleChat = useMemo(() => [...chat, ...pendingOutgoing], [chat, pendingOutgoing]);
 
-  const speakOutLoud = useCallback((text: string) => {
+  const speakOutLoud = useCallback((text: string, onFinish?: () => void) => {
     Speech.stop();
     setSpeakingText(text);
     Speech.speak(text, {
       rate: 0.9,
       onStart: () => setIsSpeaking(true),
-      onDone: () => setIsSpeaking(false),
-      onStopped: () => setIsSpeaking(false),
-      onError: () => setIsSpeaking(false),
+      onDone: () => {
+        setIsSpeaking(false);
+        onFinish?.();
+      },
+      onStopped: () => {
+        setIsSpeaking(false);
+        onFinish?.();
+      },
+      onError: () => {
+        setIsSpeaking(false);
+        onFinish?.();
+      },
     });
   }, []);
 
   useEffect(() => {
-    const storageKey = LAST_AUTO_PLAYED_KEY_BY_ROLE[currentRole];
+    const storageKey = AUTO_PLAYED_IDS_KEY_BY_ROLE[currentRole];
     AsyncStorage.getItem(storageKey)
       .then((value) => {
-        setLastAutoPlayedId(value ?? null);
+        if (!value) {
+          setAutoPlayedIds([]);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(value);
+          setAutoPlayedIds(Array.isArray(parsed) ? parsed.map(String) : []);
+        } catch {
+          setAutoPlayedIds([]);
+        }
       })
       .catch(() => {
-        setLastAutoPlayedId(null);
+        setAutoPlayedIds([]);
       });
   }, [currentRole]);
 
   const stateLabel = useMemo(() => {
-    if (lastStatus === 'success') return 'Status: Calm';
-    if (lastStatus === 'error') return 'Status: Send error';
-    return 'Status: Calm';
-  }, [lastStatus]);
+    const emotionalMap: Record<typeof emotionalState, string> = {
+      calmado: 'Calm',
+      estres: 'Stress',
+      panico: 'Panic',
+    };
+    if (!isCaregiver && lastStatus === 'error') return 'Status: Send error';
+    return `Status: ${emotionalMap[emotionalState]}`;
+  }, [emotionalState, isCaregiver, lastStatus]);
+
+  const stateDotColor = useMemo(() => {
+    if (emotionalState === 'panico') return Colors.danger;
+    if (emotionalState === 'estres') return Colors.warning;
+    return Colors.success;
+  }, [emotionalState]);
 
   useFocusEffect(
     useCallback(() => {
+      if (!isCaregiver) {
+        setIsPatientChatOpen(true);
+      }
       const pending = consumePendingEmergencyChatMessage();
       if (!pending) return;
       const id = `emergency-${Date.now()}`;
@@ -112,7 +146,12 @@ export default function TelegramSender() {
           deliveryStatus: 'sent',
         },
       ]);
-    }, [consumePendingEmergencyChatMessage])
+      return () => {
+        if (!isCaregiver) {
+          setIsPatientChatOpen(false);
+        }
+      };
+    }, [consumePendingEmergencyChatMessage, isCaregiver, setIsPatientChatOpen])
   );
 
   const postMessage = async (text: string) => {
@@ -121,6 +160,7 @@ export default function TelegramSender() {
 
     setShowSpeller(false);
     const pendingId = `pending-${Date.now()}`;
+    const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const pendingCreatedAt = Date.now();
     setPendingOutgoing((prev) => [
       ...prev,
@@ -131,6 +171,7 @@ export default function TelegramSender() {
         time: new Date(pendingCreatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         deliveryStatus: 'sending',
         createdAtMs: pendingCreatedAt,
+        clientMessageId,
       },
     ]);
     setMessage('');
@@ -138,7 +179,7 @@ export default function TelegramSender() {
     setLastStatus('idle');
 
     try {
-      await sendRealtimeMessage(currentRole, clean);
+      await sendRealtimeMessage(currentRole, clean, clientMessageId);
       setLastStatus('success');
     } catch {
       setPendingOutgoing((prev) => prev.filter((item) => item.id !== pendingId));
@@ -148,6 +189,18 @@ export default function TelegramSender() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isCaregiver) return;
+    if (emotionalState !== 'panico') {
+      panicEmergencySentRef.current = false;
+      return;
+    }
+    if (panicEmergencySentRef.current) return;
+
+    panicEmergencySentRef.current = true;
+    postMessage('EMERGENCY!');
+  }, [emotionalState, isCaregiver]);
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeMessages(
@@ -169,6 +222,10 @@ export default function TelegramSender() {
           author: item.fromRole === currentRole ? ('outgoing' as const) : ('incoming' as const),
           text: item.text,
           time: item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          readByCurrentRole:
+            item.toRole === currentRole
+              ? (currentRole === 'patient' ? item.readByPatient : item.readByCaregiver)
+              : undefined,
           deliveryStatus:
             item.fromRole === currentRole
               ? (((
@@ -186,8 +243,7 @@ export default function TelegramSender() {
             const matched = messages.some(
               (item) =>
                 item.fromRole === currentRole &&
-                item.text.trim() === pending.text.trim() &&
-                Math.abs(item.createdAt.getTime() - pending.createdAtMs) < 20000
+                item.clientMessageId === pending.clientMessageId
             );
             return !matched;
           })
@@ -201,20 +257,25 @@ export default function TelegramSender() {
 
   useEffect(() => {
     if (isCaregiver) return;
-    if (lastAutoPlayedId === undefined) return;
-    const incoming = chat.filter((m) => m.author === 'incoming');
-    if (incoming.length === 0) return;
+    if (autoPlayedIds === undefined) return;
+    if (isAutoPlayingQueueRef.current) return;
 
-    const latest = incoming[incoming.length - 1];
-    if (latest.id !== lastSpokenId.current && latest.id !== lastAutoPlayedId) {
-      lastSpokenId.current = latest.id;
-      speakOutLoud(latest.text);
-      setLastAutoPlayedId(latest.id);
-      AsyncStorage.setItem(LAST_AUTO_PLAYED_KEY_BY_ROLE[currentRole], latest.id).catch(() => {
-        // Ignore persistence errors in demo mode.
-      });
-    }
-  }, [chat, currentRole, isCaregiver, lastAutoPlayedId, speakOutLoud]);
+    const pendingIncoming = chat.filter((m) => m.author === 'incoming' && !autoPlayedIds.includes(m.id));
+    if (pendingIncoming.length === 0) return;
+
+    // Only autoplay the latest pending incoming message once.
+    const latestPending = pendingIncoming[pendingIncoming.length - 1];
+    const idsToPersist = [...new Set([...autoPlayedIds, ...pendingIncoming.map((m) => m.id)])].slice(-300);
+    setAutoPlayedIds(idsToPersist);
+    AsyncStorage.setItem(AUTO_PLAYED_IDS_KEY_BY_ROLE[currentRole], JSON.stringify(idsToPersist)).catch(() => {
+      // Ignore persistence errors in demo mode.
+    });
+
+    isAutoPlayingQueueRef.current = true;
+    speakOutLoud(latestPending.text, () => {
+      isAutoPlayingQueueRef.current = false;
+    });
+  }, [autoPlayedIds, chat, currentRole, isCaregiver, speakOutLoud]);
 
   useFocusEffect(
     useCallback(() => {
@@ -231,7 +292,7 @@ export default function TelegramSender() {
           <Text style={styles.headerName}>{isCaregiver ? 'BCI User' : 'Caregiver'}</Text>
           <Text style={styles.online}>Online</Text>
           <View style={styles.statePill}>
-            <View style={styles.stateDot} />
+            <View style={[styles.stateDot, { backgroundColor: stateDotColor }]} />
             <Text style={styles.stateText}>{stateLabel}</Text>
           </View>
         </View>
@@ -285,7 +346,17 @@ export default function TelegramSender() {
                       isSmall && styles.quickResponseBtnSmall,
                       { borderColor: action.border, backgroundColor: action.bg },
                     ]}
-                    onPress={() => postMessage(action.label)}
+                    onPress={() => {
+                      if (action.id === 'emergency') {
+                        if (emotionalState !== 'panico') {
+                          Alert.alert('Emergency disabled', 'Emergency quick action is enabled only when status is Panic.');
+                          return;
+                        }
+                        postMessage('EMERGENCY!');
+                        return;
+                      }
+                      postMessage(action.label);
+                    }}
                   >
                     <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={28} color={action.border} />
                     <Text

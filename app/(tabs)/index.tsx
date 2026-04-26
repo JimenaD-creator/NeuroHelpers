@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { Alert, View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -8,7 +8,7 @@ import { Colors, Spacing, BorderRadius, FontSize, FontWeight, getEmotionalStateC
 import { BrainIcon } from '@/components/BrainIcon';
 import { PanicDialog } from '@/components/PanicDialog';
 import { BCIDemoControls } from '@/components/BCIDemoControls';
-import { subscribeRealtimeMessages } from '@/services/realtimeChat';
+import { sendRealtimeMessage, subscribeRealtimeMessages } from '@/services/realtimeChat';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -75,6 +75,23 @@ export default function HomeScreen() {
 
     if (delivered) {
       triggerEmergency();
+      let emergencySent = false;
+      try {
+        await sendRealtimeMessage('patient', 'EMERGENCY!');
+        emergencySent = true;
+      } catch {
+        // Retry once for unstable mobile networks.
+        try {
+          await sendRealtimeMessage('patient', 'EMERGENCY!');
+          emergencySent = true;
+        } catch {
+          emergencySent = false;
+        }
+      }
+
+      if (!emergencySent) {
+        Alert.alert('Emergency message failed', 'The emergency alert could not be sent to chat. Please try again.');
+      }
       router.push('/emergency');
       return;
     }

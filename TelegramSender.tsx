@@ -327,9 +327,26 @@ export default function TelegramSender() {
           contentContainerStyle={styles.chatContent}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {visibleChat.map((item) => (
-            <View key={item.id} style={[styles.bubble, item.author === 'outgoing' ? styles.bubbleOut : styles.bubbleIn]}>
-              <Text style={[styles.bubbleText, item.author === 'outgoing' && styles.bubbleOutText]}>{item.text}</Text>
+          {visibleChat.map((item) => {
+            const isEmergencyMessage = item.text.trim().toUpperCase() === 'EMERGENCY!';
+            return (
+            <View
+              key={item.id}
+              style={[
+                styles.bubble,
+                item.author === 'outgoing' ? styles.bubbleOut : styles.bubbleIn,
+                isEmergencyMessage && styles.bubbleEmergency,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.bubbleText,
+                  item.author === 'outgoing' && styles.bubbleOutText,
+                  isEmergencyMessage && styles.bubbleEmergencyText,
+                ]}
+              >
+                {item.text}
+              </Text>
               <View style={styles.metaRow}>
                 <Text style={styles.bubbleTime}>{item.time}</Text>
                 {item.author === 'incoming' && !isCaregiver && (
@@ -342,7 +359,7 @@ export default function TelegramSender() {
                 )}
               </View>
             </View>
-          ))}
+          )})}
 
           {showPlayingCard && (
             <View style={styles.voiceCard}>
@@ -570,8 +587,10 @@ const styles = StyleSheet.create({
   },
   bubbleIn: { alignSelf: 'flex-start', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border },
   bubbleOut: { alignSelf: 'flex-end', backgroundColor: '#DBEAFE', borderWidth: 1, borderColor: '#2563EB' },
+  bubbleEmergency: { backgroundColor: '#FEE2E2', borderColor: '#DC2626' },
   bubbleText: { color: Colors.text, fontWeight: '600', fontSize: 16 },
   bubbleOutText: { color: '#1D4ED8' },
+  bubbleEmergencyText: { color: '#991B1B', fontWeight: '700' },
   bubbleTime: { color: Colors.textMuted, fontSize: 12, marginTop: 5 },
   metaRow: {
     marginTop: 5,

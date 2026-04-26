@@ -16,6 +16,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Speech from 'expo-speech';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { Colors } from './constants/theme';
@@ -54,6 +55,7 @@ export default function TelegramSender() {
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [pendingOutgoing, setPendingOutgoing] = useState<Array<ChatItem & { createdAtMs: number }>>([]);
   const scrollRef = useRef<ScrollView>(null);
+  const lastSpokenId = useRef<string | null>(null);
 
   const canSend = message.trim().length > 0 && !loading;
   const latestChatItem = chat.length > 0 ? chat[chat.length - 1] : null;
@@ -168,6 +170,28 @@ export default function TelegramSender() {
     return () => unsubscribe();
   }, [currentRole]);
 
+  const initialChatLoaded = useRef(false);
+
+  useEffect(() => {
+    if (isCaregiver) return;
+    const incoming = chat.filter((m) => m.author === 'incoming');
+    if (incoming.length === 0) return;
+
+    if (!initialChatLoaded.current) {
+      // Mark the latest as seen on first load — don't speak history
+      lastSpokenId.current = incoming[incoming.length - 1].id;
+      initialChatLoaded.current = true;
+      return;
+    }
+
+    const latest = incoming[incoming.length - 1];
+    if (latest.id !== lastSpokenId.current) {
+      lastSpokenId.current = latest.id;
+      Speech.stop();
+      Speech.speak(latest.text, { rate: 0.9 });
+    }
+  }, [chat, isCaregiver]);
+
   useFocusEffect(
     useCallback(() => {
       markRealtimeMessagesAsRead(currentRole).catch(() => {
@@ -199,6 +223,11 @@ export default function TelegramSender() {
               <Text style={[styles.bubbleText, item.author === 'outgoing' && styles.bubbleOutText]}>{item.text}</Text>
               <View style={styles.metaRow}>
                 <Text style={styles.bubbleTime}>{item.time}</Text>
+                {item.author === 'incoming' && !isCaregiver && (
+                  <TouchableOpacity onPress={() => { Speech.stop(); Speech.speak(item.text, { rate: 0.9 }); }} hitSlop={8}>
+                    <Ionicons name="volume-high-outline" size={16} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                )}
                 {item.author === 'outgoing' && item.deliveryStatus && (
                   <DeliveryStatus status={item.deliveryStatus} emphasizeBlue={!isCaregiver} />
                 )}

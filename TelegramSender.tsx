@@ -27,6 +27,10 @@ const AUTO_PLAYED_IDS_KEY_BY_ROLE = {
   patient: 'nh_autoplayed_patient_msg_ids',
   caregiver: 'nh_autoplayed_caregiver_msg_ids',
 } as const;
+const LAST_AUTO_PLAYED_INCOMING_KEY_BY_ROLE = {
+  patient: 'nh_last_autoplayed_incoming_patient_id',
+  caregiver: 'nh_last_autoplayed_incoming_caregiver_id',
+} as const;
 
 type ChatItem = {
   id: string;
@@ -63,6 +67,7 @@ export default function TelegramSender() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingText, setSpeakingText] = useState('');
   const [autoPlayedIds, setAutoPlayedIds] = useState<string[] | undefined>(undefined);
+  const [lastAutoPlayedIncomingId, setLastAutoPlayedIncomingId] = useState<string | undefined>(undefined);
   const scrollRef = useRef<ScrollView>(null);
   const isAutoPlayingQueueRef = useRef(false);
   const panicEmergencySentRef = useRef(false);
@@ -94,21 +99,34 @@ export default function TelegramSender() {
 
   useEffect(() => {
     const storageKey = AUTO_PLAYED_IDS_KEY_BY_ROLE[currentRole];
+    const lastIncomingKey = LAST_AUTO_PLAYED_INCOMING_KEY_BY_ROLE[currentRole];
     AsyncStorage.getItem(storageKey)
       .then((value) => {
         if (!value) {
           setAutoPlayedIds([]);
-          return;
+        } else {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              setAutoPlayedIds(parsed.map(String));
+            } else if (typeof parsed === 'string') {
+              setAutoPlayedIds([parsed]);
+            } else {
+              setAutoPlayedIds([]);
+            }
+          } catch {
+            // Backward compatibility: old format may be plain string id.
+            setAutoPlayedIds([value]);
+          }
         }
-        try {
-          const parsed = JSON.parse(value);
-          setAutoPlayedIds(Array.isArray(parsed) ? parsed.map(String) : []);
-        } catch {
-          setAutoPlayedIds([]);
-        }
+        return AsyncStorage.getItem(lastIncomingKey);
+      })
+      .then((lastId) => {
+        setLastAutoPlayedIncomingId(lastId ?? undefined);
       })
       .catch(() => {
         setAutoPlayedIds([]);
+        setLastAutoPlayedIncomingId(undefined);
       });
   }, [currentRole]);
 
@@ -258,6 +276,7 @@ export default function TelegramSender() {
   useEffect(() => {
     if (isCaregiver) return;
     if (autoPlayedIds === undefined) return;
+    if (lastAutoPlayedIncomingId === undefined) return;
     if (isAutoPlayingQueueRef.current) return;
 
     const pendingIncoming = chat.filter((m) => m.author === 'incoming' && !autoPlayedIds.includes(m.id));
@@ -265,9 +284,14 @@ export default function TelegramSender() {
 
     // Only autoplay the latest pending incoming message once.
     const latestPending = pendingIncoming[pendingIncoming.length - 1];
+    if (latestPending.id === lastAutoPlayedIncomingId) return;
     const idsToPersist = [...new Set([...autoPlayedIds, ...pendingIncoming.map((m) => m.id)])].slice(-300);
     setAutoPlayedIds(idsToPersist);
     AsyncStorage.setItem(AUTO_PLAYED_IDS_KEY_BY_ROLE[currentRole], JSON.stringify(idsToPersist)).catch(() => {
+      // Ignore persistence errors in demo mode.
+    });
+    setLastAutoPlayedIncomingId(latestPending.id);
+    AsyncStorage.setItem(LAST_AUTO_PLAYED_INCOMING_KEY_BY_ROLE[currentRole], latestPending.id).catch(() => {
       // Ignore persistence errors in demo mode.
     });
 
@@ -275,7 +299,7 @@ export default function TelegramSender() {
     speakOutLoud(latestPending.text, () => {
       isAutoPlayingQueueRef.current = false;
     });
-  }, [autoPlayedIds, chat, currentRole, isCaregiver, speakOutLoud]);
+  }, [autoPlayedIds, chat, currentRole, isCaregiver, lastAutoPlayedIncomingId, speakOutLoud]);
 
   useFocusEffect(
     useCallback(() => {

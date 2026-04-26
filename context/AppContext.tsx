@@ -80,6 +80,7 @@ const defaultSettings: Settings = {
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+const EMOTIONAL_STATE_CYCLE_MS = 8000;
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [emotionalState, setEmotionalState] = useState<EmotionalState>('calmado');
@@ -100,6 +101,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const pendingEmergencyChatTextRef = useRef<string | null>(null);
   const panicEmergencyLockRef = useRef(false);
+
+  useEffect(() => {
+    const cycle: EmotionalState[] = ['calmado', 'estres', 'panico'];
+    const interval = setInterval(() => {
+      setEmotionalState((prev) => {
+        const idx = cycle.indexOf(prev);
+        const nextIdx = idx === -1 ? 0 : (idx + 1) % cycle.length;
+        return cycle[nextIdx];
+      });
+    }, EMOTIONAL_STATE_CYCLE_MS);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (emotionalState !== 'panico') {

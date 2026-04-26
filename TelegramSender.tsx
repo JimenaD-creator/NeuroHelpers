@@ -23,6 +23,10 @@ import { Colors } from './constants/theme';
 import { markRealtimeMessagesAsRead, sendRealtimeMessage, subscribeRealtimeMessages } from '@/services/realtimeChat';
 
 const CAREGIVER_LAST_SEEN_KEY = 'nh_caregiver_last_seen_v1';
+const LAST_AUTO_PLAYED_KEY_BY_ROLE = {
+  patient: 'nh_last_autoplayed_patient_msg_id',
+  caregiver: 'nh_last_autoplayed_caregiver_msg_id',
+} as const;
 
 type ChatItem = {
   id: string;
@@ -54,13 +58,38 @@ export default function TelegramSender() {
   const [showSpeller, setShowSpeller] = useState(false);
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [pendingOutgoing, setPendingOutgoing] = useState<Array<ChatItem & { createdAtMs: number }>>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingText, setSpeakingText] = useState('');
+  const [lastAutoPlayedId, setLastAutoPlayedId] = useState<string | null | undefined>(undefined);
   const scrollRef = useRef<ScrollView>(null);
   const lastSpokenId = useRef<string | null>(null);
 
   const canSend = message.trim().length > 0 && !loading;
-  const latestChatItem = chat.length > 0 ? chat[chat.length - 1] : null;
-  const showPlayingCard = latestChatItem?.author === 'incoming' && !isCaregiver;
+  const showPlayingCard = isSpeaking && !isCaregiver;
   const visibleChat = useMemo(() => [...chat, ...pendingOutgoing], [chat, pendingOutgoing]);
+
+  const speakOutLoud = useCallback((text: string) => {
+    Speech.stop();
+    setSpeakingText(text);
+    Speech.speak(text, {
+      rate: 0.9,
+      onStart: () => setIsSpeaking(true),
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false),
+    });
+  }, []);
+
+  useEffect(() => {
+    const storageKey = LAST_AUTO_PLAYED_KEY_BY_ROLE[currentRole];
+    AsyncStorage.getItem(storageKey)
+      .then((value) => {
+        setLastAutoPlayedId(value ?? null);
+      })
+      .catch(() => {
+        setLastAutoPlayedId(null);
+      });
+  }, [currentRole]);
 
   const stateLabel = useMemo(() => {
     if (lastStatus === 'success') return 'Status: Calm';
@@ -170,27 +199,22 @@ export default function TelegramSender() {
     return () => unsubscribe();
   }, [currentRole]);
 
-  const initialChatLoaded = useRef(false);
-
   useEffect(() => {
     if (isCaregiver) return;
+    if (lastAutoPlayedId === undefined) return;
     const incoming = chat.filter((m) => m.author === 'incoming');
     if (incoming.length === 0) return;
 
-    if (!initialChatLoaded.current) {
-      // Mark the latest as seen on first load — don't speak history
-      lastSpokenId.current = incoming[incoming.length - 1].id;
-      initialChatLoaded.current = true;
-      return;
-    }
-
     const latest = incoming[incoming.length - 1];
-    if (latest.id !== lastSpokenId.current) {
+    if (latest.id !== lastSpokenId.current && latest.id !== lastAutoPlayedId) {
       lastSpokenId.current = latest.id;
-      Speech.stop();
-      Speech.speak(latest.text, { rate: 0.9 });
+      speakOutLoud(latest.text);
+      setLastAutoPlayedId(latest.id);
+      AsyncStorage.setItem(LAST_AUTO_PLAYED_KEY_BY_ROLE[currentRole], latest.id).catch(() => {
+        // Ignore persistence errors in demo mode.
+      });
     }
-  }, [chat, isCaregiver]);
+  }, [chat, currentRole, isCaregiver, lastAutoPlayedId, speakOutLoud]);
 
   useFocusEffect(
     useCallback(() => {
@@ -224,7 +248,7 @@ export default function TelegramSender() {
               <View style={styles.metaRow}>
                 <Text style={styles.bubbleTime}>{item.time}</Text>
                 {item.author === 'incoming' && !isCaregiver && (
-                  <TouchableOpacity onPress={() => { Speech.stop(); Speech.speak(item.text, { rate: 0.9 }); }} hitSlop={8}>
+                  <TouchableOpacity onPress={() => speakOutLoud(item.text)} hitSlop={8}>
                     <Ionicons name="volume-high-outline" size={16} color={Colors.textMuted} />
                   </TouchableOpacity>
                 )}
@@ -239,6 +263,9 @@ export default function TelegramSender() {
             <View style={styles.voiceCard}>
               <Text style={styles.voiceIcon}>🔊</Text>
               <Text style={styles.voiceTitle}>Playing...</Text>
+              <Text style={styles.voiceNowPlaying} numberOfLines={1}>
+                {speakingText}
+              </Text>
               <Text style={styles.wave}>································</Text>
             </View>
           )}
@@ -484,6 +511,7 @@ const styles = StyleSheet.create({
   },
   voiceIcon: { fontSize: 32 },
   voiceTitle: { marginTop: 4, fontSize: 16, fontWeight: '700', color: Colors.primary },
+  voiceNowPlaying: { marginTop: 4, color: Colors.textSecondary, fontSize: 12, fontWeight: '600' },
   wave: { marginTop: 8, color: Colors.primary, fontWeight: '700', letterSpacing: 2 },
   quickActions: { paddingHorizontal: 14, gap: 7, paddingTop: 8, marginTop: 0 },
   quickBtn: {

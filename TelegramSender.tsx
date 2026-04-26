@@ -67,7 +67,7 @@ export default function TelegramSender() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingText, setSpeakingText] = useState('');
   const [autoPlayedIds, setAutoPlayedIds] = useState<string[] | undefined>(undefined);
-  const [lastAutoPlayedIncomingId, setLastAutoPlayedIncomingId] = useState<string | undefined>(undefined);
+  const [lastAutoPlayedIncomingId, setLastAutoPlayedIncomingId] = useState<string | null | undefined>(undefined);
   const scrollRef = useRef<ScrollView>(null);
   const isAutoPlayingQueueRef = useRef(false);
   const panicEmergencySentRef = useRef(false);
@@ -122,11 +122,11 @@ export default function TelegramSender() {
         return AsyncStorage.getItem(lastIncomingKey);
       })
       .then((lastId) => {
-        setLastAutoPlayedIncomingId(lastId ?? undefined);
+        setLastAutoPlayedIncomingId(lastId ?? null);
       })
       .catch(() => {
         setAutoPlayedIds([]);
-        setLastAutoPlayedIncomingId(undefined);
+        setLastAutoPlayedIncomingId(null);
       });
   }, [currentRole]);
 
